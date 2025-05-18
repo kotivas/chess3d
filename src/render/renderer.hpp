@@ -26,7 +26,7 @@ public:
 	Renderer(Config& config);
 
 	// render shadow map from light position
-	void generateShadowMap(Scene& scene);
+	void genShadowMaps(Scene& scene);
 
 	// draw scene to the FBO
 	void drawScene(Scene& scene);
@@ -46,9 +46,10 @@ private:
 
 	void createFrameBuffer();
 	void createQuadVAO();
-	void createDepthMap();
 	void createUBO();
-	//void createDepthCubeMap();
+
+	void initShadowMaps();
+	void createShadowMap(uint32_t& shadowMap, uint32_t& shadowMapFBO, const uint16_t resolution);
 
 	void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& lightSpaceMatrix);
 	void updateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
@@ -59,13 +60,12 @@ private:
 
 	Config& config;
 
-	glm::mat4 lightSpaceMatrix;
-
 	uint32_t FBO, RBO;
 	uint32_t UBOMatrices, UBOLights, UBOData;
 
-	uint32_t shadowMapFBO;
-	uint32_t shadowMap;
+	glm::mat4 dirLightSpaceMatrix;
+	uint32_t dirShadowMap, dirShadowMapFBO;
+	// todo make shadow struct/class
 
 	uint32_t quadVAO, quadVBO;
 	uint32_t textureColorBuffer;

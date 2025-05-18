@@ -20,15 +20,15 @@ struct Transform {
 	glm::vec3 rotation{0};
 	glm::vec3 scale{1};
 
-	glm::mat4 getMatrix() const {
+	[[nodiscard]] glm::mat4 getMatrix() const {
 		glm::mat4 transform{ 1 };
-		transform = glm::scale(transform, scale);
+		transform = glm::translate(transform, position);
 
 		transform = glm::rotate(transform, glm::radians(rotation.x), { 1, 0, 0 });
 		transform = glm::rotate(transform, glm::radians(rotation.y), { 0, 1, 0 });
 		transform = glm::rotate(transform, glm::radians(rotation.z), { 0, 0, 1 });
 
-		transform = glm::translate(transform, position);
+		transform = glm::scale(transform, scale);
 		return (transform == glm::mat4(0)) ? glm::mat4(1) : transform;
 	}
 };
@@ -40,10 +40,10 @@ struct Material {
 	float shininess{0};
 	ShaderPtr shader;
 	glm::vec3 solidColor;
-	bool useSolidColor{0};
+	bool useSolidColor{false};
 	//GLuint ior;       // index of refraction
 	//GLuint dissolve;  // 1 == opaque; 0 == fully transparent
-	void apply();
+	void apply() const;
 };
 using MaterialPtr = std::shared_ptr<Material>;
 

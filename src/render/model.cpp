@@ -33,7 +33,7 @@ void Mesh::setup() {
 	glBindVertexArray(0);
 }
 
-void Material::apply() {
+void Material::apply() const {
 	assert(shader);
 
 	shader->use();
