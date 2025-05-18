@@ -10,6 +10,8 @@
 
 #include "../util.hpp"
 
+#include <filesystem>
+
 namespace ResourceManager {
 
 static uint32_t defaultTexture;
@@ -137,7 +139,7 @@ const char* TextureTypeToString(aiTextureType type) {
 	default: return "UNKNOWN";
 	}
 }
-Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial) {
+Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& modelName) {
 	Render::MaterialPtr nmat = std::make_shared<Render::Material>();
 
 	aiString matName;
@@ -149,20 +151,21 @@ Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial) {
 	nmat->shininess = shininess;
 	if (nmat->shininess == 0) nmat->shininess = 32.f;
 
-	if (nmat->name == "Mat") {
-		nmat->diffuse[0] = CreateTexture("assets/textures/Flashlight/Untitled_1_Mat_BaseColor.png");
-	} else {
-		nmat->diffuse[0] = CreateDefaultTexture();
-	}
-
 	aiString diffuseTexPath;
 	if (aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexPath) == AI_SUCCESS) {
 		nmat->diffuse[0] = CreateTexture(diffuseTexPath.C_Str());
+	} else if ( std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_Diffuse.png") ) { // assets/textures/desk/BaseColor.png
+		nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_Diffuse.png");
+	} else {
+		std::cout << OUT_ERROR << "No diffuse texture for material: " << nmat->name << std::endl;
+		nmat->diffuse[0] = CreateDefaultTexture();
 	}
 
 	aiString specularTexPath;
 	if (aiMaterial->GetTexture(aiTextureType_SPECULAR, 0, &specularTexPath) == AI_SUCCESS) {
 		nmat->specular[0] = CreateTexture(specularTexPath.C_Str());
+	} else if ( std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_Specular.png") ) {
+		nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_Specular.png");
 	}
 
 	return nmat;
@@ -192,7 +195,7 @@ Render::ModelPtr LoadModel(const std::string& path, Render::ShaderPtr shader) {
 
 	for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
 		aiMaterial* aiMaterial = scene->mMaterials[i];
-		nmats.push_back(ProcessMaterial(aiMaterial));
+		nmats.push_back(ProcessMaterial(aiMaterial, model->name));
 		nmats.back()->shader = shader;
 	}
 
@@ -215,6 +218,7 @@ Render::ModelPtr LoadModel(const std::string& path, Render::ShaderPtr shader) {
 		model->meshes.push_back(mesh);
 	}
 
+	std::cout << OUT_DEBUG << "Model loaded: " << name << std::endl;
 	return model;
 }
 

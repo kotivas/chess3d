@@ -11,7 +11,7 @@ uint32_t CreateDefaultTexture();
 uint32_t CreateTexture(const std::string& path);
 
 Render::MeshPtr ProcessMesh(aiMesh* aiMesh);
-Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial);
+Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& modelName);
 Render::ModelPtr LoadModel(const std::string& path, Render::ShaderPtr shader);
 
 }

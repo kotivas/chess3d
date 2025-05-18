@@ -1,3 +1,4 @@
+// it is what it is
 #include <iostream>
 
 #include "render/shader.hpp"
@@ -13,15 +14,17 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include "util.hpp"
 
+// TODO make it json or smth
 static Scene scene{
-	.camera {
+	.camera{
 		.position = {0, 0, 0},
-		.target = {5, 15, 0},
+		.target = {0, 17, 0},
 
 		.radius = 30.f,
 
-		.yaw = -90.f,
+		.yaw = 90.f,
 		.pitch = 45.f,
 
 		.lastx = 400,
@@ -32,16 +35,16 @@ static Scene scene{
 
 		.locked = true
 	},
-	.dirLight {
-		.enable = false,
+	.dirLight{
+		.enable = true,
 		.direction = {-0.5f, -1.0f, -0.5f},
-		.ambient = glm::vec3(0.2f),
-		.diffuse = glm::vec3(0.8f),
-		.specular = glm::vec3(0.5f)
+		.ambient = glm::vec3(0.05f),
+		.diffuse = glm::vec3(0.2f),
+		.specular = glm::vec3(0.2f)
 	},
 	.pointLight{
-		.enable = true,
-		.position = {100.f, 100.f, 50.f},
+		.enable = false,
+		.position = {0.f, 25.f, 0.f},
 
 		.constant = 1.f,
 		.linear = 0.09f,
@@ -58,11 +61,14 @@ static Scene scene{
 
 		.constant = 1.f,
 		.linear = 0.09f,
-		.quadratic = 0.032f,
+		// .quadratic = 0.032f,
+		.quadratic = 0.001,
 
 		.ambient = glm::vec3(0.f),
 		.diffuse = glm::vec3(1.f),
-		.specular = glm::vec3(1.f)
+		.specular = glm::vec3(1.f),
+
+		.flashlight = false
 	}
 };
 static Render::PostEffects effects{
@@ -108,13 +114,12 @@ void DrawIMGUI() {
 		if (ImGui::InputInt2("Render Resolution", &config.renderRes[0])) {
 			renderer->updateRenderRes();
 		}
-		if (ImGui::InputInt("Shadow Resolution", &config.shadowRes)) {
-			renderer->updateShadowRes();
-		}
+		// if (ImGui::InputInt("Shadow Resolution", &config.shadowRes)) {
+		// renderer->updateShadowRes();
+		// }
 	}
 
 	if (ImGui::CollapsingHeader("Camera Settings")) {
-
 		ImGui::SliderFloat("Field Of View", &scene.camera.fov, 0, 100, "%.2f");
 		ImGui::InputFloat3("Target", &scene.camera.target[0], "%.2f");
 		ImGui::SliderFloat("Sensitivity", &scene.camera.sens, 0, 10, "%.1f");
@@ -122,7 +127,7 @@ void DrawIMGUI() {
 
 	if (ImGui::CollapsingHeader("Light Settings")) {
 		if (ImGui::TreeNode("Directional Light")) {
-			//ImGui::Checkbox("Enable", &scene.dirLight.enable);
+			ImGui::SliderInt("Enable", &scene.dirLight.enable, 0, 1);
 
 			ImGui::BeginDisabled(!scene.dirLight.enable);
 
@@ -137,7 +142,7 @@ void DrawIMGUI() {
 			ImGui::TreePop();
 		}
 		if (ImGui::TreeNode("Point Light")) {
-			//ImGui::Checkbox("Enable", &scene.pointLight.enable);
+			ImGui::SliderInt("Enable", &scene.pointLight.enable, 0, 1);
 
 			ImGui::BeginDisabled(!scene.pointLight.enable);
 
@@ -156,11 +161,16 @@ void DrawIMGUI() {
 			ImGui::TreePop();
 		}
 		if (ImGui::TreeNode("Spot Light")) {
-			//ImGui::Checkbox("Enable", &scene.spotLight.enable);
+			ImGui::SliderInt("Enable", &scene.spotLight.enable, 0, 1);
+
+			ImGui::Checkbox("Flashlight mode", &scene.spotLight.flashlight);
 
 			ImGui::BeginDisabled(!scene.spotLight.enable);
 
 			//ImGui::ColorEdit3("Color", &scene.spotLight.color[0]);
+
+			ImGui::InputFloat3("Position", &scene.spotLight.position[0]);
+			ImGui::InputFloat3("Direction", &scene.spotLight.direction[0]);
 
 			ImGui::InputFloat3("Ambient", &scene.spotLight.ambient[0]);
 			ImGui::InputFloat3("Diffuse", &scene.spotLight.diffuse[0]);
@@ -181,7 +191,6 @@ void DrawIMGUI() {
 	if (ImGui::CollapsingHeader("Objects Settings")) {
 		for (const auto& model : scene.models) {
 			if (ImGui::TreeNode(model->name.c_str())) {
-
 				ImGui::InputFloat3("Scale", &model->transform.scale[0]);
 				ImGui::InputFloat3("Position", &model->transform.position[0]);
 				ImGui::InputFloat3("Rotation", &model->transform.rotation[0]);
@@ -197,7 +206,6 @@ void DrawIMGUI() {
 
 					for (const auto& mesh : model->meshes) {
 						if (ImGui::TreeNode(mesh->name.c_str())) {
-
 							ImGui::Checkbox("Draw", &mesh->drawable);
 
 							ImGui::BeginDisabled(!mesh->drawable);
@@ -226,6 +234,7 @@ void DrawIMGUI() {
 
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
+
 void SetStyleIMGUI() {
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec4* colors = style.Colors;
@@ -258,11 +267,13 @@ void SetStyleIMGUI() {
 	style.WindowPadding = ImVec2(10, 10);
 	style.FramePadding = ImVec2(5, 5);
 }
+
 void InitIMGUI() {
 	// Setup ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGuiIO& io = ImGui::GetIO();
+	(void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
 
 	// Setup ImGui style
@@ -300,38 +311,46 @@ void SaveScreenshot(const char* filename) {
 
 	// Сохранение в PNG
 	stbi_write_png(filename, config.windowRes.x, config.windowRes.y, 3, flippedPixels.data(), config.windowRes.x * 3);
-	std::cout << "[info] Screenshot saved in " << filename << std::endl;
+	std::cout << OUT_INFO << "Screenshot saved as " << filename << std::endl;
 }
 
 void MousePosCallback(GLFWwindow* window, double xpos, double ypos) {
 	scene.camera.mouseMoved(xpos, ypos);
 }
+
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
 		scene.camera.locked = false;
 		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	} else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
+	}
+	else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
 		scene.camera.locked = true;
 		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
 }
+
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, GL_TRUE);
-	} else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
+	}
+	else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
 		scene.camera = Camera();
-	} else if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+	}
+	else if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
 		SaveScreenshot("frame.png");
 	}
 }
+
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 	scene.camera.mouseScrolled(yoffset);
 }
+
 void ResizeCallback(GLFWwindow* window, int width, int height) {
 	if (width == 0 && height == 0) return; // in case of minimizing
-	config.windowRes = { width, height };
+	config.windowRes = {width, height};
 	glViewport(0, 0, width, height);
 }
+
 void InitGLFW() {
 	// Init GLFW
 	glfwInit();
@@ -361,10 +380,10 @@ Render::MeshPtr CreateSphereMesh(float radius, uint32_t stackCount, uint32_t sli
 
 	// Генерация вершин
 	mesh->vertices.push_back({
-		glm::vec3(0.0f, radius, 0.0f),    // position
-		glm::vec3(0.0f, 1.0f, 0.0f),      // normal
-		glm::vec2(0.5f, 0.0f)             // tex_coords
-		});
+		glm::vec3(0.0f, radius, 0.0f), // position
+		glm::vec3(0.0f, 1.0f, 0.0f), // normal
+		glm::vec2(0.5f, 0.0f) // tex_coords
+	});
 
 	const float pi = glm::pi<float>();
 	for (uint32_t stack = 1; stack < stackCount; ++stack) {
@@ -394,10 +413,10 @@ Render::MeshPtr CreateSphereMesh(float radius, uint32_t stackCount, uint32_t sli
 	}
 
 	mesh->vertices.push_back({
-		glm::vec3(0.0f, -radius, 0.0f),   // position
-		glm::vec3(0.0f, -1.0f, 0.0f),     // normal
-		glm::vec2(0.5f, 1.0f)             // tex_coords
-		});
+		glm::vec3(0.0f, -radius, 0.0f), // position
+		glm::vec3(0.0f, -1.0f, 0.0f), // normal
+		glm::vec2(0.5f, 1.0f) // tex_coords
+	});
 
 	// Генерация индексов (counter-clockwise порядок)
 	const uint32_t poleStart = 0;
@@ -442,23 +461,28 @@ Render::MeshPtr CreateSphereMesh(float radius, uint32_t stackCount, uint32_t sli
 
 	return mesh;
 }
-Render::ModelPtr CreateLightSphere() {
+
+Render::ModelPtr CreateLightSphere(float radius, int stackCount, int sliceCount) {
 	Render::ModelPtr model = std::make_unique<Render::Model>();
-	Render::MeshPtr mesh = CreateSphereMesh(8, 32, 32);
+	Render::MeshPtr mesh = CreateSphereMesh(radius, stackCount, sliceCount);
 	Render::MaterialPtr mat = std::make_unique<Render::Material>();
 
 	mat->name = "light";
-	mat->diffuse[0] = ResourceManager::CreateDefaultTexture();
-	mat->specular[0] = ResourceManager::CreateDefaultTexture();
+	mat->solidColor = {1, 1, 1};
+	mat->useSolidColor = true;
 	mat->shininess = 8;
 
+	mat->shader = std::make_shared<Render::Shader>("assets/shaders/light.vert", "assets/shaders/light.frag");
+
 	model->name = "light";
-	model->meshes[0]->material = mat;
 	model->meshes.push_back(mesh);
+	model->meshes[0]->material = mat;
 
 	return model;
 }
-Render::ModelPtr CreatePlane(const std::string& diffuse, const std::string& specular, float shininess, const std::string& name) {
+
+Render::ModelPtr CreatePlane(const std::string& diffuse, const std::string& specular, float shininess,
+                             const std::string& name) {
 	Render::MeshPtr mesh = std::make_unique<Render::Mesh>();;
 	Render::ModelPtr model = std::make_unique<Render::Model>();;
 	Render::MaterialPtr mat = std::make_unique<Render::Material>();
@@ -475,12 +499,13 @@ Render::ModelPtr CreatePlane(const std::string& diffuse, const std::string& spec
 	mesh->name = name;
 
 	mesh->vertices = {
-	{ {-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} },
-	{ { 0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f} },
-	{ { 0.5f, 0.0f,  0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f} },
-	{ {-0.5f, 0.0f,  0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f} } };
+		{{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+		{{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+		{{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+		{{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+	};
 
-	mesh->indices = { 0, 2, 1, 0, 3, 2 };
+	mesh->indices = {0, 2, 1, 0, 3, 2};
 	mesh->material = mat;
 
 	mesh->setup();
@@ -496,70 +521,55 @@ Render::ModelPtr CreatePlane(const std::string& diffuse, const std::string& spec
 void setupScene(bool props) {
 	// setup chess set
 
-	Render::ShaderPtr shader = std::make_shared<Render::Shader>("assets/shaders/scene.vert", "assets/shaders/scene.frag");
+	Render::ShaderPtr shader = std::make_shared<Render::Shader>("assets/shaders/scene.vert",
+	                                                            "assets/shaders/scene.frag");
 
 	if (props) {
+		Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
+		scene.models.push_back(lightBulb);
 
-		//Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/ChessSet.obj");
-		//chess->setScale(20);
-		//chess->setPosition(0, 0.81, -0.3);
-		//chess->setRotation(0, -25, 0);
-		//scene.models.push_back(chess);
-
-		//// setup lamp
-
-		//Render::ModelPtr lamp = ResourceManager::LoadModel("assets/models/lampa.obj");
-		//lamp->setScale(0.2);
-		//lamp->setPosition(-22, 101, -40);
-		//lamp->setRotation(0, 45, 0);
-		//scene.models.push_back(lamp);
-
-		//// setup AK
-
-		//Render::ModelPtr ak = ResourceManager::LoadModel("assets/models/ak.obj");
-
-		//ak->findMeshByName("stock")->draw = false;
-		//ak->findMeshByName("magazine")->rotation = { 30, 0, 0 };
-		//ak->findMeshByName("magazine")->position = { 0, -0.3, -0.3 };
-
-		//ak->setPosition(3.29, 0, 1.5);
-		//ak->setRotation(0, -55, 90);
-		//ak->setScale(5);
-		//scene.models.push_back(ak);
-
-		// setup desk  
-		
-		Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader); 
-		desk->transform.scale = { 20, 20, 20 };
-		scene.models.push_back(desk); 
-
-		Render::ModelPtr revolver = ResourceManager::LoadModel("assets/models/ColtPyton.obj", shader);
-		revolver->transform.scale = { 2, 2, 2 };
-		revolver->transform.position = { 0, 9, 0 };
+		Render::ModelPtr revolver = ResourceManager::LoadModel("assets/models/RustGun.obj", shader);
+		revolver->transform.scale = {2, 2, 2};
+		revolver->transform.position = {2, 16.47, 0};
+		revolver->transform.rotation = {-88, 0, 45};
 		scene.models.push_back(revolver);
 
+		// Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/chess.fbx", shader);
+		// chess->transform.position = {7, 16.28, 0};
+		// chess->transform.scale = {0.03, 0.03, 0.03};
+		// scene.models.push_back(chess);
+
+		Render::ModelPtr patch = ResourceManager::LoadModel("assets/models/patch.dae", shader);
+		patch->transform.rotation = {-90, 0, -32};
+		patch->transform.position = {3, 14.58, 0};
+		scene.models.push_back(patch);
+
+		Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader);
+		desk->transform.scale = {20, 20, 20};
+		scene.models.push_back(desk);
 	}
 
 	// create floor
 
-	Render::ModelPtr floor = CreatePlane("assets/textures/woodFloor/wood_floor_diff.png", "assets/textures/woodFloor/wood_floor_rough.png", 8, "Floor");
-	floor->transform.scale = { 100, 100, 100 };
+	Render::ModelPtr floor = CreatePlane("assets/textures/woodFloor/wood_floor_diff.png",
+	                                     "assets/textures/woodFloor/wood_floor_rough.png", 8, "Floor");
+	floor->transform.scale = {100, 100, 100};
 	floor->meshes[0]->material->shader = shader;
 	scene.models.push_back(floor);
-
 }
 
-int main() {
+int main(int argc, char** argv) {
 	InitGLFW();
 	InitIMGUI();
 
+	// TODO make loading screen w/ progresbar
 	setupScene(true);
 
 	renderer = new Render::Renderer(config);
 
 	while (!glfwWindowShouldClose(window)) {
-
-		renderer->generateShadowMap(scene);
+		scene.models[0]->transform.position = scene.pointLight.position;
+		renderer->genShadowMaps(scene);
 		renderer->drawScene(scene);
 		renderer->renderFrame(effects);
 
