@@ -1,8 +1,5 @@
 #include "resource_manager.hpp"
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include <glad/glad.h>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -157,7 +154,7 @@ Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& m
 	} else if ( std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_Diffuse.png") ) { // assets/textures/desk/BaseColor.png
 		nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_Diffuse.png");
 	} else {
-		std::cout << OUT_ERROR << "No diffuse texture for material: " << nmat->name << std::endl;
+		std::cout << OUT_WARNING << "No diffuse texture for material: " << nmat->name << std::endl;
 		nmat->diffuse[0] = CreateDefaultTexture();
 	}
 

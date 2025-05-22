@@ -1,5 +1,7 @@
 // it is what it is
 #include <iostream>
+#include <array>
+#include <algorithm>
 
 #include "render/shader.hpp"
 #include "render/model.hpp"
@@ -13,6 +15,8 @@
 #include <imgui_impl_opengl3.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <numeric>
+
 #include "stb_image_write.h"
 #include "util.hpp"
 
@@ -86,17 +90,28 @@ static Config config{
 
 	// --- GRAPHICS ---
 	.renderDistance = 1000.f,
-	.vsync = true
+	.vsync = false
 };
 
 static GLFWwindow* window = nullptr;
 static Render::Renderer* renderer = nullptr;
 
-void DrawIMGUI() {
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
+static std::array<float, 256> FPS = {0};
+static bool DEBUG_INFO = false;
 
+void DrawDebugInfo() {
+	ImGui::Begin("Debug Info");
+
+	const float largest_num = *(std::max_element(FPS.begin(), FPS.end()));
+	const float avg_num = std::accumulate(FPS.begin(), FPS.end(), 0.0) / FPS.size();
+
+	ImGui::PlotLines(" ", FPS.data(), FPS.size(), 0, ("avg: " + std::to_string(avg_num)).c_str(), 0, largest_num + 200,
+	                 {300, 70});
+
+	ImGui::End(); // End general options
+}
+
+void DrawOptions() {
 	// General Options
 	ImGui::Begin("General Options");
 
@@ -228,11 +243,6 @@ void DrawIMGUI() {
 	}
 
 	ImGui::End(); // End general options
-
-	// Rendering
-	ImGui::Render();
-
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void SetStyleIMGUI() {
@@ -339,6 +349,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	else if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
 		SaveScreenshot("frame.png");
 	}
+	else if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+		DEBUG_INFO = !DEBUG_INFO;
+	}
 }
 
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
@@ -351,13 +364,79 @@ void ResizeCallback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
+void APIENTRY glDebugOutput(GLenum source,
+                            GLenum type,
+                            unsigned int id,
+                            GLenum severity,
+                            GLsizei length,
+                            const char* message,
+                            const void* userParam) {
+	// ignore non-significant error/warning codes
+	// if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+	if (id == 131204 || id == 131185) return;
+
+	std::cout << OUT_DEBUG << "(";
+
+	switch (severity) {
+	case GL_DEBUG_SEVERITY_HIGH: std::cout << "\033[31mhigh\033[0m";
+		break;
+	case GL_DEBUG_SEVERITY_MEDIUM: std::cout << "\033[33mmedium\033[0m";
+		break;
+	case GL_DEBUG_SEVERITY_LOW: std::cout << "\033[32mlow\033[0m";
+		break;
+	case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "\033[34mnotification\033[0m";
+		break;
+	}
+	std::cout << "; ";
+
+	switch (source) {
+	case GL_DEBUG_SOURCE_API: std::cout << "API";
+		break;
+	case GL_DEBUG_SOURCE_WINDOW_SYSTEM: std::cout << "Window System";
+		break;
+	case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Shader Compiler";
+		break;
+	case GL_DEBUG_SOURCE_THIRD_PARTY: std::cout << "Third Party";
+		break;
+	case GL_DEBUG_SOURCE_APPLICATION: std::cout << "Application";
+		break;
+	case GL_DEBUG_SOURCE_OTHER: std::cout << "Other";
+		break;
+	}
+	std::cout << "; ";
+
+	switch (type) {
+	case GL_DEBUG_TYPE_ERROR: std::cout << "Error";
+		break;
+	case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Deprecated Behaviour";
+		break;
+	case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: std::cout << "Undefined Behaviour";
+		break;
+	case GL_DEBUG_TYPE_PORTABILITY: std::cout << "Portability";
+		break;
+	case GL_DEBUG_TYPE_PERFORMANCE: std::cout << "Performance";
+		break;
+	case GL_DEBUG_TYPE_MARKER: std::cout << "Marker";
+		break;
+	case GL_DEBUG_TYPE_PUSH_GROUP: std::cout << "Push Group";
+		break;
+	case GL_DEBUG_TYPE_POP_GROUP: std::cout << "Pop Group";
+		break;
+	case GL_DEBUG_TYPE_OTHER: std::cout << "Other";
+		break;
+	}
+
+	std::cout << "): " << message << " (" << id << ")" << std::endl;
+}
+
 void InitGLFW() {
 	// Init GLFW
 	glfwInit();
 	// Set all the required options for GLFW
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 	//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 	window = glfwCreateWindow(config.windowRes.x, config.windowRes.y, "chess3d", nullptr, nullptr);
@@ -372,6 +451,15 @@ void InitGLFW() {
 	glfwSwapInterval(config.vsync); // vsync 1 - on; 0 - off
 
 	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+	int flags;
+	glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+	if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+		glEnable(GL_DEBUG_OUTPUT);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glDebugMessageCallback(glDebugOutput, nullptr);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+	}
 }
 
 Render::MeshPtr CreateSphereMesh(float radius, uint32_t stackCount, uint32_t sliceCount) {
@@ -567,13 +655,30 @@ int main(int argc, char** argv) {
 
 	renderer = new Render::Renderer(config);
 
+	double lastTime = glfwGetTime();
+	int frameCount = 0;
+	uint8_t indexFPS = 0;
+
 	while (!glfwWindowShouldClose(window)) {
-		scene.models[0]->transform.position = scene.pointLight.position;
+		if (DEBUG_INFO) {
+			frameCount++;
+			FPS[indexFPS] = frameCount / (glfwGetTime() - lastTime);
+			indexFPS++;
+			frameCount = 0;
+			lastTime = glfwGetTime();
+		}
+
 		renderer->genShadowMaps(scene);
 		renderer->drawScene(scene);
 		renderer->renderFrame(effects);
 
-		DrawIMGUI();
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+		DrawOptions();
+		if (DEBUG_INFO) DrawDebugInfo();
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

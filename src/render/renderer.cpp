@@ -199,7 +199,10 @@ namespace Render {
 		depthShader.use();
 		depthShader.setUniformMat4fv("u_LightSpaceMatrix", 1, false, dirLightSpaceMatrix);
 
-		for (auto& model : scene.models) { model->draw(depthShader); }
+		for (auto& model : scene.models) {
+			if (model->name == "Floor") continue; // todo not drop shadow option
+			model->draw(depthShader);
+		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
