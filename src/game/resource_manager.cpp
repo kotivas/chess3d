@@ -151,18 +151,19 @@ Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& m
 	aiString diffuseTexPath;
 	if (aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexPath) == AI_SUCCESS) {
 		nmat->diffuse[0] = CreateTexture(diffuseTexPath.C_Str());
-	} else if ( std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_Diffuse.png") ) { // assets/textures/desk/BaseColor.png
-		nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_Diffuse.png");
+	} else if ( std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png") ) { // assets/textures/desk/BaseColor.png
+		nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png");
 	} else {
-		std::cout << OUT_WARNING << "No diffuse texture for material: " << nmat->name << std::endl;
+		std::cout << OUT_WARNING << "No diffuse texture for material: " << nmat->name;
+		std::cout << " (unable to find at path " << "assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png)" << std::endl;
 		nmat->diffuse[0] = CreateDefaultTexture();
 	}
 
 	aiString specularTexPath;
 	if (aiMaterial->GetTexture(aiTextureType_SPECULAR, 0, &specularTexPath) == AI_SUCCESS) {
 		nmat->specular[0] = CreateTexture(specularTexPath.C_Str());
-	} else if ( std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_Specular.png") ) {
-		nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_Specular.png");
+	} else if ( std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_specular.png") ) {
+		nmat->specular[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_specular.png");
 	}
 
 	return nmat;

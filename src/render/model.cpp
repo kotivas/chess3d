@@ -36,6 +36,12 @@ void Mesh::setup() {
 void Material::apply() const {
 	assert(shader);
 
+	// bind diffuse map
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, diffuse[0]);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, specular[0]);
+
 	shader->use();
 
 	shader->setUniform1f("material.shininess", shininess); // to _materials
@@ -43,20 +49,17 @@ void Material::apply() const {
 	shader->setUniform1i("material.useSolidColor", useSolidColor);
 	shader->setUniform1i("shadowMap", 0);
 
-	// bind diffuse map
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, diffuse[0]);
-	shader->setUniform1i("material.diffuse", 1);
-	//bind specular map
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, specular[0]);
-	shader->setUniform1i("material.specular", 2);
+	shader->setUniform1i("dirShadowMap", 0);
+	shader->setUniform1i("spotShadowMap", 1);
+	shader->setUniform1i("material.diffuse", 3);
+	shader->setUniform1i("material.specular", 4);
 }
 
 void Mesh::draw(Transform& model) {
 	assert(material);
 
 	material->apply();
+
 
 	glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
 	material->shader->setUniformMat4fv("u_Model", 1, GL_FALSE, modelMat);
@@ -68,22 +71,21 @@ void Mesh::draw(Transform& model) {
 	glActiveTexture(GL_TEXTURE0);
 }
 
-void Mesh::draw(Transform& model, Shader& shader) {
+void Mesh::draw(const Transform& model, const ShaderPtr& shader) {
 	assert(material);
 
-	shader.use();
+	shader->use();
 
 	glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
-	shader.setUniformMat4fv("u_Model", 1, GL_FALSE, modelMat);
+	shader->setUniformMat4fv("u_Model", 1, GL_FALSE, modelMat);
 
 	glBindVertexArray(VAO);
 	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 
-	glActiveTexture(GL_TEXTURE0);
 }
 
-void Model::draw(Shader& shader) {
+void Model::draw(const ShaderPtr& shader) {
 	for (const MeshPtr& mesh : meshes) {
 		if (mesh->drawable) {
 			mesh->draw(this->transform, shader);

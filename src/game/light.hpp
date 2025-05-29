@@ -40,6 +40,4 @@ struct SpotLight {
 	alignas(16) glm::vec3 ambient;
 	alignas(16) glm::vec3 diffuse;
 	alignas(16) glm::vec3 specular;
-
-	bool flashlight; // i don't think it should be there, but who cares
 };

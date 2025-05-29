@@ -60,24 +60,25 @@ static Scene scene{
 	},
 	.spotLight{
 		.enable = false,
-		.cutOff = glm::radians(12.5f),
-		.outerCutOff = glm::radians(17.5f),
+		.cutOff = glm::cos(glm::radians(12.5f)), // cos
+		.outerCutOff = glm::cos(glm::radians(17.5f)), // cos
+
+		.position = {3, 45, 30},
+		.direction = {0, -0.5, -0.5},
 
 		.constant = 1.f,
 		.linear = 0.09f,
 		// .quadratic = 0.032f,
-		.quadratic = 0.001,
+		.quadratic = 0.001f,
 
 		.ambient = glm::vec3(0.f),
 		.diffuse = glm::vec3(1.f),
 		.specular = glm::vec3(1.f),
-
-		.flashlight = false
 	}
 };
 static Render::PostEffects effects{
 	.quantization = false,
-	.quantizationLevel = 32,
+	.quantizationLevel = 4,
 
 	.vignette = true,
 	.vignetteIntensity = 0.25f,
@@ -86,7 +87,7 @@ static Render::PostEffects effects{
 static Config config{
 	.windowRes = {1280, 720},
 	.renderRes = {1920, 1080}, // 320, 240
-	.shadowRes = 15360, // 16k
+	.shadowRes = 2048,
 
 	// --- GRAPHICS ---
 	.renderDistance = 1000.f,
@@ -100,7 +101,7 @@ static std::array<float, 256> FPS = {0};
 static bool DEBUG_INFO = false;
 
 void DrawDebugInfo() {
-	ImGui::Begin("Debug Info");
+	ImGui::Begin("Debug Info", 0, ImGuiWindowFlags_NoTitleBar);
 
 	const float largest_num = *(std::max_element(FPS.begin(), FPS.end()));
 	const float avg_num = std::accumulate(FPS.begin(), FPS.end(), 0.0) / FPS.size();
@@ -178,8 +179,6 @@ void DrawOptions() {
 		if (ImGui::TreeNode("Spot Light")) {
 			ImGui::SliderInt("Enable", &scene.spotLight.enable, 0, 1);
 
-			ImGui::Checkbox("Flashlight mode", &scene.spotLight.flashlight);
-
 			ImGui::BeginDisabled(!scene.spotLight.enable);
 
 			//ImGui::ColorEdit3("Color", &scene.spotLight.color[0]);
@@ -195,8 +194,8 @@ void DrawOptions() {
 			ImGui::InputFloat("Linear", &scene.spotLight.linear);
 			ImGui::InputFloat("Quadratic", &scene.spotLight.quadratic);
 
-			ImGui::SliderAngle("CutOff", &scene.spotLight.cutOff, 0, glm::degrees(scene.spotLight.outerCutOff) - 1);
-			ImGui::SliderAngle("OuterCutOff", &scene.spotLight.outerCutOff, 0, 100);
+			ImGui::SliderAngle("CutOff", &scene.spotLight.cutOff, 0, 180);
+			ImGui::SliderAngle("OuterCutOff", &scene.spotLight.outerCutOff, 0, glm::degrees(scene.spotLight.cutOff) - 1);
 
 			ImGui::EndDisabled();
 			ImGui::TreePop();
@@ -206,6 +205,7 @@ void DrawOptions() {
 	if (ImGui::CollapsingHeader("Objects Settings")) {
 		for (const auto& model : scene.models) {
 			if (ImGui::TreeNode(model->name.c_str())) {
+				ImGui::Checkbox("Cast Shadow", &model->castShadow);
 				ImGui::InputFloat3("Scale", &model->transform.scale[0]);
 				ImGui::InputFloat3("Position", &model->transform.position[0]);
 				ImGui::InputFloat3("Rotation", &model->transform.rotation[0]);
@@ -250,32 +250,43 @@ void SetStyleIMGUI() {
 	ImVec4* colors = style.Colors;
 
 	// Setting up a dark theme base
-	colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.6f); // Semi-transparent dark background
-	colors[ImGuiCol_ChildBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.4f);
+	// colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.6f); // Semi-transparent dark background
+	colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.1f); // Semi-transparent dark background
+	colors[ImGuiCol_ChildBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
 	colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.8f);
-	colors[ImGuiCol_Border] = ImVec4(0.8f, 0.8f, 0.8f, 0.2f);
+	colors[ImGuiCol_Border] = ImVec4(0.8f, 0.8f, 0.8f, 0.f);
 
 	// Text and frames
 	colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-	colors[ImGuiCol_FrameBg] = ImVec4(0.2f, 0.2f, 0.2f, 0.5f); // Semi-transparent for frosted look
+	colors[ImGuiCol_FrameBg] = ImVec4(0.2f, 0.2f, 0.2f, 0.2f); // Semi-transparent for frosted look
 	colors[ImGuiCol_FrameBgHovered] = ImVec4(0.3f, 0.3f, 0.3f, 0.7f);
 	colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 0.9f);
 
 	// Header
-	colors[ImGuiCol_Header] = ImVec4(0.3f, 0.3f, 0.3f, 0.7f);
-	colors[ImGuiCol_HeaderHovered] = ImVec4(0.4f, 0.4f, 0.4f, 0.8f);
-	colors[ImGuiCol_HeaderActive] = ImVec4(0.4f, 0.4f, 0.4f, 1.0f);
+	colors[ImGuiCol_Header] = ImVec4(0.3f, 0.3f, 0.3f, 0.1f);
+	colors[ImGuiCol_HeaderHovered] = ImVec4(0.4f, 0.4f, 0.4f, 0.1f);
+	colors[ImGuiCol_HeaderActive] = ImVec4(0.4f, 0.4f, 0.4f, 0.1f);
 
 	// Buttons
 	colors[ImGuiCol_Button] = ImVec4(0.3f, 0.3f, 0.3f, 0.6f);
 	colors[ImGuiCol_ButtonHovered] = ImVec4(0.4f, 0.4f, 0.4f, 0.8f);
 	colors[ImGuiCol_ButtonActive] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
 
+	colors[ImGuiCol_PlotLines] = ImVec4(0.5, 0.5, 0.5, 1.0f);
+	colors[ImGuiCol_PlotLinesHovered] = ImVec4(1, 1, 1, 1.0f);
+
+	colors[ImGuiCol_TitleBgActive] = ImVec4(0, 0, 0, 0.3);
+	colors[ImGuiCol_TitleBg] = ImVec4(0, 0, 0, 0.3);
+
+	colors[ImGuiCol_ResizeGrip] = ImVec4(0, 0, 0, 0.3);
+	colors[ImGuiCol_ResizeGripActive] = ImVec4(0, 0, 0, 0.5);
+	colors[ImGuiCol_ResizeGripHovered] = ImVec4(0, 0, 0, 0.6);
+
 	// Adjust window rounding and padding to enhance the glass look
 	style.WindowRounding = 10.0f;
 	style.FrameRounding = 5.0f;
 	style.WindowPadding = ImVec2(10, 10);
-	style.FramePadding = ImVec2(5, 5);
+	// style.FramePadding = ImVec2(5, 5);
 }
 
 void InitIMGUI() {
@@ -290,7 +301,7 @@ void InitIMGUI() {
 	ImGui::StyleColorsDark();
 	SetStyleIMGUI();
 
-	io.Fonts->AddFontFromFileTTF("assets/fonts/NotoSans-Medium.ttf", 18.f);
+	// io.Fonts->AddFontFromFileTTF("assets/fonts/NotoSans-Medium.ttf", 18.f);
 
 	// Setup Platform/Renderer bindings
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -364,13 +375,8 @@ void ResizeCallback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
-void APIENTRY glDebugOutput(GLenum source,
-                            GLenum type,
-                            unsigned int id,
-                            GLenum severity,
-                            GLsizei length,
-                            const char* message,
-                            const void* userParam) {
+void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length,
+                            const char* message, const void* userParam) {
 	// ignore non-significant error/warning codes
 	// if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
 	if (id == 131204 || id == 131185) return;
@@ -613,14 +619,15 @@ void setupScene(bool props) {
 	                                                            "assets/shaders/scene.frag");
 
 	if (props) {
-		Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
-		scene.models.push_back(lightBulb);
+		// Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
+		// lightBulb->castShadow = false;
+		// scene.models.push_back(lightBulb);
 
-		Render::ModelPtr revolver = ResourceManager::LoadModel("assets/models/RustGun.obj", shader);
-		revolver->transform.scale = {2, 2, 2};
-		revolver->transform.position = {2, 16.47, 0};
-		revolver->transform.rotation = {-88, 0, 45};
-		scene.models.push_back(revolver);
+		Render::ModelPtr chainsaw = ResourceManager::LoadModel("assets/models/chainsaw.obj", shader);
+		chainsaw->transform.scale = {0.2, 0.2, 0.2};
+		chainsaw->transform.position = {-10, 20, 0};
+		chainsaw->transform.rotation = {-90, -10, 0};
+		scene.models.push_back(chainsaw);
 
 		// Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/chess.fbx", shader);
 		// chess->transform.position = {7, 16.28, 0};
@@ -629,7 +636,7 @@ void setupScene(bool props) {
 
 		Render::ModelPtr patch = ResourceManager::LoadModel("assets/models/patch.dae", shader);
 		patch->transform.rotation = {-90, 0, -32};
-		patch->transform.position = {3, 14.58, 0};
+		patch->transform.position = {3, 14.58, 3};
 		scene.models.push_back(patch);
 
 		Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader);
@@ -643,6 +650,7 @@ void setupScene(bool props) {
 	                                     "assets/textures/woodFloor/wood_floor_rough.png", 8, "Floor");
 	floor->transform.scale = {100, 100, 100};
 	floor->meshes[0]->material->shader = shader;
+	floor->castShadow = false;
 	scene.models.push_back(floor);
 }
 
@@ -666,6 +674,10 @@ int main(int argc, char** argv) {
 			indexFPS++;
 			frameCount = 0;
 			lastTime = glfwGetTime();
+
+			scene.spotLight.position = scene.camera.position;
+
+			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
 		}
 
 		renderer->genShadowMaps(scene);

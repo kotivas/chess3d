@@ -23,7 +23,9 @@ set(SOURCE
 	"src/render/model.cpp"
 	"src/game/game.cpp"
  	"src/game/resource_manager.cpp"
-		"src/util.cpp")
+		"src/util.cpp"
+		src/render/shadow.cpp
+		src/render/shadow.hpp)
 
 add_executable(chess3d ${SOURCE} )
 add_custom_command(

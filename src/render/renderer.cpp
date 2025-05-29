@@ -6,7 +6,6 @@ namespace Render {
 		  UBOMatrices(0), quadVAO(0), quadVBO(0),
 		  textureColorBuffer(0) {
 		postfxShader.loadShader("assets/shaders/postfx.vert", "assets/shaders/postfx.frag");
-		depthShader.loadShader("assets/shaders/depth.vert", "assets/shaders/depth.frag");
 
 		glViewport(0, 0, config.windowRes.x, config.windowRes.y);
 
@@ -18,9 +17,19 @@ namespace Render {
 		glCullFace(GL_BACK); // Указываем, какие грани отсекать (задние)
 		glFrontFace(GL_CCW); // Указываем порядок вершин для лицевых граней (CCW по умолчанию)
 
+		// work with shadows
+		ShaderPtr depthShader = std::make_shared<Render::Shader>("assets/shaders/depth.vert",
+		                                                         "assets/shaders/depth.frag");
+		spotShadow.shader = depthShader;
+		spotShadow.resolution = config.shadowRes; // todo maybe i should split it
+		spotShadow.generate();
+
+		dirShadow.shader = depthShader;
+		dirShadow.resolution = config.shadowRes;
+		dirShadow.generate();
+
 		createFrameBuffer();
 		createQuadVAO();
-		initShadowMaps();
 		createUBO();
 	}
 
@@ -74,48 +83,15 @@ namespace Render {
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 	}
 
-	void Renderer::initShadowMaps() {
-		createShadowMap(dirShadowMap, dirShadowMapFBO, config.shadowRes);
-	}
-
-	void Renderer::createShadowMap(uint32_t& shadowMap, uint32_t& shadowMapFBO, const uint16_t resolution) {
-		glGenFramebuffers(1, &shadowMapFBO);
-
-		// generate texture
-		glGenTextures(1, &shadowMap);
-		glBindTexture(GL_TEXTURE_2D, shadowMap);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-		             resolution, resolution, 0,
-		             GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-
-		// setup texture
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-		float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
-		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-		// attach texture to the fbo
-		glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-		                       GL_TEXTURE_2D, shadowMap, 0);
-		glDrawBuffer(GL_NONE);
-		glReadBuffer(GL_NONE);
-
-		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
-
 	void Renderer::createUBO() {
 		// ====== MATRICES ======
 		glGenBuffers(1, &UBOMatrices);
 
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
-		glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+		glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, 3 * sizeof(glm::mat4));
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, 4 * sizeof(glm::mat4));
 		// ====== LIGHTS ======
 		glGenBuffers(1, &UBOLights);
 
@@ -144,19 +120,22 @@ namespace Render {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 
 		//glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
 	void Renderer::updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view,
-	                                 const glm::mat4& lightSpaceMatrix) {
+	                                 const glm::mat4& dirLightSpaceMatrix, const glm::mat4& spotLightSpaceMatrix) {
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
 		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(lightSpaceMatrix));
+		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4),
+		                glm::value_ptr(dirLightSpaceMatrix));
+		glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), sizeof(glm::mat4),
+		                glm::value_ptr(spotLightSpaceMatrix));
 
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
@@ -184,24 +163,37 @@ namespace Render {
 
 		// light space matrix for directional light
 
-		glm::mat4 lightProjection = glm::ortho(-100.f, 100.f, -100.f, 100.f, 0.1f, config.renderDistance);
-		glm::vec3 lightPos = -scene.dirLight.direction * glm::vec3(100);
-		// HACK shadow casts incorrectly, if light falls vertically downward
-		glm::vec3 lightUp = glm::abs(scene.dirLight.direction.y) < 0.999 ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
-		glm::mat4 lightView = glm::lookAt(lightPos, lightPos + scene.dirLight.direction, lightUp);
-		dirLightSpaceMatrix = lightProjection * lightView;
+		if (scene.dirLight.enable) {
+			dirShadow.calculateLightSpaceMatrix(scene.dirLight.direction, 0.1f, config.renderDistance);
 
-		// render scene from light's point of view
-		glViewport(0, 0, config.shadowRes, config.shadowRes);
-		glBindFramebuffer(GL_FRAMEBUFFER, dirShadowMapFBO);
-		glClear(GL_DEPTH_BUFFER_BIT);
+			// render scene from light's point of view
+			glViewport(0, 0, config.shadowRes, config.shadowRes);
+			glBindFramebuffer(GL_FRAMEBUFFER, dirShadow.shadowMapFBO);
+			glClear(GL_DEPTH_BUFFER_BIT);
 
-		depthShader.use();
-		depthShader.setUniformMat4fv("u_LightSpaceMatrix", 1, false, dirLightSpaceMatrix);
+			dirShadow.shader->use();
+			dirShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", 1, false, dirShadow.lightSpaceMatrix);
 
-		for (auto& model : scene.models) {
-			if (model->name == "Floor") continue; // todo not drop shadow option
-			model->draw(depthShader);
+			for (auto& model : scene.models) {
+				if (model->castShadow) model->draw(dirShadow.shader);
+			}
+		}
+		if (scene.spotLight.enable) {
+			spotShadow.calculateLightSpaceMatrix(scene.spotLight.position, scene.spotLight.direction,
+			                                     scene.spotLight.outerCutOff, 0.1f, config.renderDistance);
+
+
+			// render scene from light's point of view
+			glViewport(0, 0, config.shadowRes, config.shadowRes);
+			glBindFramebuffer(GL_FRAMEBUFFER, spotShadow.shadowMapFBO);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			spotShadow.shader->use();
+			spotShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", 1, false, spotShadow.lightSpaceMatrix);
+
+			for (auto& model : scene.models) {
+				if (model->castShadow) model->draw(spotShadow.shader);
+			}
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -215,11 +207,6 @@ namespace Render {
 
 	void Renderer::drawScene(Scene& scene) {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO); // draw everything in custom framebuffer
-
-		if (scene.spotLight.flashlight) {
-			scene.spotLight.position = scene.camera.position;
-			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
-		}
 		scene.camera.updatePosition();
 
 		updateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
@@ -228,11 +215,14 @@ namespace Render {
 			glm::perspective(glm::radians(scene.camera.fov), (float)config.windowRes.x / (float)config.windowRes.y,
 			                 0.1f, config.renderDistance),
 			glm::lookAt(scene.camera.position, scene.camera.target, glm::vec3(0.0f, 1.0f, 0.0f)),
-			dirLightSpaceMatrix
+			dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix
 		);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, dirShadowMap);
+		glBindTexture(GL_TEXTURE_2D, dirShadow.shadowMap);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, spotShadow.shadowMap);
 
 		for (auto& model : scene.models) {
 			model->draw();
@@ -258,6 +248,8 @@ namespace Render {
 
 		glBindVertexArray(quadVAO);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+		// glBindTexture(GL_TEXTURE_2D, spotShadow.shadowMap);
+		// glBindTexture(GL_TEXTURE_2D, dirShadow.shadowMap);
 		// use the color attachment texture as the texture of the quad plane
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -267,21 +259,21 @@ namespace Render {
 	}
 
 
-	void Renderer::updateShadowRes() {
-		glBindTexture(GL_TEXTURE_2D, dirShadowMap);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-		             config.shadowRes, config.shadowRes, 0,
-		             GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-
-		// check FBO status
-		glBindFramebuffer(GL_FRAMEBUFFER, dirShadowMapFBO);
-		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-		if (status != GL_FRAMEBUFFER_COMPLETE) {
-			std::cerr << "Shadow FBO incomplete after resize! Status: 0x"
-				<< std::hex << status << std::dec << std::endl;
-		}
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
+	// void Renderer::updateShadowRes() {
+	// 	glBindTexture(GL_TEXTURE_2D, dirShadowMap);
+	// 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+	// 	             config.shadowRes, config.shadowRes, 0,
+	// 	             GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+	//
+	// 	// check FBO status
+	// 	glBindFramebuffer(GL_FRAMEBUFFER, dirShadowMapFBO);
+	// 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	// 	if (status != GL_FRAMEBUFFER_COMPLETE) {
+	// 		std::cerr << "Shadow FBO incomplete after resize! Status: 0x"
+	// 			<< std::hex << status << std::dec << std::endl;
+	// 	}
+	// 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// }
 
 	void Renderer::updateRenderRes() {
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);

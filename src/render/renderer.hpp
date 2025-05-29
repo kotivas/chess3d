@@ -9,6 +9,7 @@
 
 #include "../game/config.hpp"
 #include "../game/scene.hpp"
+#include "shadow.hpp"
 
 namespace Render {
 
@@ -48,24 +49,19 @@ private:
 	void createQuadVAO();
 	void createUBO();
 
-	void initShadowMaps();
-	void createShadowMap(uint32_t& shadowMap, uint32_t& shadowMapFBO, const uint16_t resolution);
-
-	void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& lightSpaceMatrix);
+	void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& dirLightSpaceMatrix, const glm::mat4& spotLightSpaceMatrix);
 	void updateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
 	void UpdateUBOData(const glm::vec3& viewPos);
 		
 	Shader postfxShader;
-	Shader depthShader;
 
 	Config& config;
 
 	uint32_t FBO, RBO;
 	uint32_t UBOMatrices, UBOLights, UBOData;
 
-	glm::mat4 dirLightSpaceMatrix;
-	uint32_t dirShadowMap, dirShadowMapFBO;
-	// todo make shadow struct/class
+	DirShadowData dirShadow;
+	SpotShadowData spotShadow;
 
 	uint32_t quadVAO, quadVBO;
 	uint32_t textureColorBuffer;

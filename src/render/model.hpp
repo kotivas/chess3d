@@ -60,23 +60,24 @@ struct Mesh {
 	MaterialPtr material;
 
 	void draw(Transform& model);
-	void draw(Transform& model, Shader& shader);
+	void draw(const Transform& model, const ShaderPtr& shader);
 
 	void setup();
 };
 using MeshPtr = std::shared_ptr<Mesh>;
 
 struct Model {
-	Model() : name("undefined") {}
+	Model() : name("undefined"), castShadow(true) {}
 
 	MeshPtr findMeshByName(const std::string& name) const;
 
 	void draw();
-	void draw(Shader& shader);
+	void draw(const ShaderPtr& shader);
 
 	//std::vector<Material> materials;
 	std::vector<MeshPtr> meshes; // unordered map for quicker search by name
 	std::string name;
+	bool castShadow;
 	Transform transform;
 
 	~Model();
