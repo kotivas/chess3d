@@ -3,6 +3,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include "shader.hpp"
+#include <array>
 
 namespace Render {
 	struct DirShadowData {
@@ -44,6 +45,22 @@ namespace Render {
 		~SpotShadowData();
 	};
 
-	struct PointShadowData {
+	struct OmniShadowData {
+		OmniShadowData()
+			: shader(nullptr), resolution(512), shadowCubemap(0), shadowCubemapFBO(0) {
+		}
+
+		ShaderPtr shader;
+		uint32_t resolution;
+
+		uint32_t shadowCubemap;
+		uint32_t shadowCubemapFBO;
+
+		std::array<glm::mat4, 6> transforms;
+
+		void generate();
+		void genTransformMatrixes(glm::vec3 lightPos, float nearPlane, float farPlane);
+
+		~OmniShadowData();
 	};
 }

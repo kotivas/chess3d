@@ -14,6 +14,8 @@ struct Vertex {
 	glm::vec3 pos;
 	glm::vec3 normal;
 	glm::vec2 texCoords;
+	glm::vec3 tangent;
+    glm::vec3 bitangent;
 };
 struct Transform {
 	glm::vec3 position{0};
@@ -35,8 +37,11 @@ struct Transform {
 
 struct Material {
 	std::string name;
+
 	uint32_t diffuse[3];
 	uint32_t specular[3];
+	uint32_t normal[3];
+
 	float shininess{0};
 	ShaderPtr shader;
 	glm::vec3 solidColor;

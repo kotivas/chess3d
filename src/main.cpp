@@ -40,19 +40,21 @@ static Scene scene{
 		.locked = true
 	},
 	.dirLight{
-		.enable = true,
+		.enable = false,
 		.direction = {-0.5f, -1.0f, -0.5f},
 		.ambient = glm::vec3(0.05f),
 		.diffuse = glm::vec3(0.2f),
 		.specular = glm::vec3(0.2f)
 	},
 	.pointLight{
-		.enable = false,
-		.position = {0.f, 25.f, 0.f},
+		.enable = true,
+		.position = {0.f, 35.f, 0.f},
 
 		.constant = 1.f,
-		.linear = 0.09f,
-		.quadratic = 0.032f,
+		// .linear = 0.09f,
+		// .quadratic = 0.032f,
+		.linear = 0,
+		.quadratic = 0.000f,
 
 		.ambient = glm::vec3(0.1f),
 		.diffuse = glm::vec3(0.8f),
@@ -103,7 +105,7 @@ static bool DEBUG_INFO = false;
 void DrawDebugInfo() {
 	ImGui::Begin("Debug Info", 0, ImGuiWindowFlags_NoTitleBar);
 
-	const float largest_num = *(std::max_element(FPS.begin(), FPS.end()));
+	const float largest_num = *(std::ranges::max_element(FPS));
 	const float avg_num = std::accumulate(FPS.begin(), FPS.end(), 0.0) / FPS.size();
 
 	ImGui::PlotLines(" ", FPS.data(), FPS.size(), 0, ("avg: " + std::to_string(avg_num)).c_str(), 0, largest_num + 200,
@@ -195,7 +197,8 @@ void DrawOptions() {
 			ImGui::InputFloat("Quadratic", &scene.spotLight.quadratic);
 
 			ImGui::SliderAngle("CutOff", &scene.spotLight.cutOff, 0, 180);
-			ImGui::SliderAngle("OuterCutOff", &scene.spotLight.outerCutOff, 0, glm::degrees(scene.spotLight.cutOff) - 1);
+			ImGui::SliderAngle("OuterCutOff", &scene.spotLight.outerCutOff, 0,
+			                   glm::degrees(scene.spotLight.cutOff) - 1);
 
 			ImGui::EndDisabled();
 			ImGui::TreePop();
@@ -575,8 +578,7 @@ Render::ModelPtr CreateLightSphere(float radius, int stackCount, int sliceCount)
 	return model;
 }
 
-Render::ModelPtr CreatePlane(const std::string& diffuse, const std::string& specular, float shininess,
-                             const std::string& name) {
+Render::ModelPtr CreatePlane(const std::string& diffuse, float shininess, const std::string& name) {
 	Render::MeshPtr mesh = std::make_unique<Render::Mesh>();;
 	Render::ModelPtr model = std::make_unique<Render::Model>();;
 	Render::MaterialPtr mat = std::make_unique<Render::Material>();
@@ -585,7 +587,7 @@ Render::ModelPtr CreatePlane(const std::string& diffuse, const std::string& spec
 
 	mat->name = name;
 	mat->diffuse[0] = ResourceManager::CreateTexture(diffuse);
-	mat->specular[0] = ResourceManager::CreateTexture(specular);
+	// mat->specular[0] = ResourceManager::CreateTexture(specular);
 	mat->shininess = shininess;
 
 	// setup mesh
@@ -619,9 +621,9 @@ void setupScene(bool props) {
 	                                                            "assets/shaders/scene.frag");
 
 	if (props) {
-		// Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
-		// lightBulb->castShadow = false;
-		// scene.models.push_back(lightBulb);
+		Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
+		lightBulb->castShadow = false;
+		scene.models.push_back(lightBulb);
 
 		Render::ModelPtr chainsaw = ResourceManager::LoadModel("assets/models/chainsaw.obj", shader);
 		chainsaw->transform.scale = {0.2, 0.2, 0.2};
@@ -646,8 +648,7 @@ void setupScene(bool props) {
 
 	// create floor
 
-	Render::ModelPtr floor = CreatePlane("assets/textures/woodFloor/wood_floor_diff.png",
-	                                     "assets/textures/woodFloor/wood_floor_rough.png", 8, "Floor");
+	Render::ModelPtr floor = CreatePlane("assets/textures/woodFloor/wood_floor_diff.png", 8, "Floor");
 	floor->transform.scale = {100, 100, 100};
 	floor->meshes[0]->material->shader = shader;
 	floor->castShadow = false;
@@ -679,6 +680,8 @@ int main(int argc, char** argv) {
 
 			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
 		}
+
+		scene.models[0]->transform.position = scene.pointLight.position;
 
 		renderer->genShadowMaps(scene);
 		renderer->drawScene(scene);

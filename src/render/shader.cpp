@@ -61,7 +61,7 @@ GLuint Shader::createShader(const std::string& vertexPath, const std::string& fr
 	glDeleteShader(vs);
 	glDeleteShader(fs);
 	if (gs) glDeleteShader(gs);
-	
+
 	std::cout << OUT_DEBUG << "Shader loaded: " << vertexPath << " " << fragmentPath << " " << geometryPath << std::endl;
 
 	return program;
@@ -82,8 +82,8 @@ void Shader::setUniform4f(const std::string& name, float v0, float v1, float v2,
 void Shader::setUniform4f(const std::string& name, glm::vec4 v) const { glUniform4f(glGetUniformLocation(_id, name.c_str()), v.x, v.y, v.z, v.w); }
 
 // ------------------------------------------------------------------------
-void Shader::setUniformMat4fv(const std::string& name, GLsizei count, GLboolean transpose, glm::mat4& value) const {
-	glUniformMatrix4fv(glGetUniformLocation(_id, name.c_str()), count, transpose, glm::value_ptr(value));
+void Shader::setUniformMat4fv(const std::string& name, GLboolean transpose, glm::mat4& value) const {
+	glUniformMatrix4fv(glGetUniformLocation(_id, name.c_str()), 1, transpose, glm::value_ptr(value));
 }
 
 

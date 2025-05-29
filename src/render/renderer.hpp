@@ -62,6 +62,7 @@ private:
 
 	DirShadowData dirShadow;
 	SpotShadowData spotShadow;
+	OmniShadowData pointShadow;
 
 	uint32_t quadVAO, quadVBO;
 	uint32_t textureColorBuffer;

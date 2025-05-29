@@ -18,15 +18,23 @@ namespace Render {
 		glFrontFace(GL_CCW); // Указываем порядок вершин для лицевых граней (CCW по умолчанию)
 
 		// work with shadows
-		ShaderPtr depthShader = std::make_shared<Render::Shader>("assets/shaders/depth.vert",
-		                                                         "assets/shaders/depth.frag");
-		spotShadow.shader = depthShader;
+		ShaderPtr dirShader = std::make_shared<Render::Shader>("assets/shaders/depth.vert",
+		                                                       "assets/shaders/depth.frag");
+		spotShadow.shader = dirShader;
 		spotShadow.resolution = config.shadowRes; // todo maybe i should split it
 		spotShadow.generate();
 
-		dirShadow.shader = depthShader;
+		dirShadow.shader = dirShader;
 		dirShadow.resolution = config.shadowRes;
 		dirShadow.generate();
+
+		ShaderPtr omniShader = std::make_shared<Render::Shader>("assets/shaders/point_shadow_depth.vert",
+		                                                        "assets/shaders/point_shadow_depth.frag",
+		                                                        "assets/shaders/point_shadow_depth.geom");
+
+		pointShadow.shader = omniShader;
+		pointShadow.resolution = config.shadowRes;
+		pointShadow.generate();
 
 		createFrameBuffer();
 		createQuadVAO();
@@ -110,10 +118,10 @@ namespace Render {
 		glGenBuffers(1, &UBOData);
 
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOData);
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec3), NULL, GL_STATIC_DRAW);
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec3) + sizeof(float), NULL, GL_STATIC_DRAW);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-		glBindBufferRange(GL_UNIFORM_BUFFER, 2, UBOData, 0, sizeof(glm::vec3));
+		glBindBufferRange(GL_UNIFORM_BUFFER, 2, UBOData, 0, sizeof(glm::vec3) + sizeof(float));
 	}
 
 	void Renderer::renderClear() {
@@ -154,12 +162,13 @@ namespace Render {
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOData);
 
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(viewPos), glm::value_ptr(viewPos));
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec3), sizeof(float), &config.renderDistance);
 
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
 	void Renderer::genShadowMaps(Scene& scene) {
-		glCullFace(GL_FRONT);
+		// glCullFace(GL_FRONT);
 
 		// light space matrix for directional light
 
@@ -167,12 +176,12 @@ namespace Render {
 			dirShadow.calculateLightSpaceMatrix(scene.dirLight.direction, 0.1f, config.renderDistance);
 
 			// render scene from light's point of view
-			glViewport(0, 0, config.shadowRes, config.shadowRes);
+			glViewport(0, 0, dirShadow.resolution, dirShadow.resolution);
 			glBindFramebuffer(GL_FRAMEBUFFER, dirShadow.shadowMapFBO);
 			glClear(GL_DEPTH_BUFFER_BIT);
 
 			dirShadow.shader->use();
-			dirShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", 1, false, dirShadow.lightSpaceMatrix);
+			dirShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, dirShadow.lightSpaceMatrix);
 
 			for (auto& model : scene.models) {
 				if (model->castShadow) model->draw(dirShadow.shader);
@@ -182,18 +191,44 @@ namespace Render {
 			spotShadow.calculateLightSpaceMatrix(scene.spotLight.position, scene.spotLight.direction,
 			                                     scene.spotLight.outerCutOff, 0.1f, config.renderDistance);
 
-
 			// render scene from light's point of view
-			glViewport(0, 0, config.shadowRes, config.shadowRes);
+			glViewport(0, 0, spotShadow.resolution, spotShadow.resolution);
 			glBindFramebuffer(GL_FRAMEBUFFER, spotShadow.shadowMapFBO);
 			glClear(GL_DEPTH_BUFFER_BIT);
 
 			spotShadow.shader->use();
-			spotShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", 1, false, spotShadow.lightSpaceMatrix);
+			spotShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, spotShadow.lightSpaceMatrix);
 
 			for (auto& model : scene.models) {
 				if (model->castShadow) model->draw(spotShadow.shader);
 			}
+		}
+		if (scene.pointLight.enable) {
+			pointShadow.genTransformMatrixes(scene.pointLight.position, 0.1f, config.renderDistance);
+
+			// render scene from light's point of view
+			glViewport(0, 0, pointShadow.resolution, pointShadow.resolution);
+			glBindFramebuffer(GL_FRAMEBUFFER, pointShadow.shadowCubemapFBO);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			pointShadow.shader->use();
+
+			// TODO возможно я могу как то сделать, что бы за раз передавать 6 матриц
+			pointShadow.shader->setUniformMat4fv("shadowMatrices[0]", false, pointShadow.transforms[0]);
+			pointShadow.shader->setUniformMat4fv("shadowMatrices[1]", false, pointShadow.transforms[1]);
+			pointShadow.shader->setUniformMat4fv("shadowMatrices[2]", false, pointShadow.transforms[2]);
+			pointShadow.shader->setUniformMat4fv("shadowMatrices[3]", false, pointShadow.transforms[3]);
+			pointShadow.shader->setUniformMat4fv("shadowMatrices[4]", false, pointShadow.transforms[4]);
+			pointShadow.shader->setUniformMat4fv("shadowMatrices[5]", false, pointShadow.transforms[5]);
+
+			pointShadow.shader->setUniform1f("far_plane", config.renderDistance);
+			pointShadow.shader->setUniform3f("lightPos", scene.pointLight.position);
+
+			for (auto& model : scene.models) {
+				if (model->castShadow) model->draw(pointShadow.shader);
+			}
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -223,6 +258,9 @@ namespace Render {
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, spotShadow.shadowMap);
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
 
 		for (auto& model : scene.models) {
 			model->draw();

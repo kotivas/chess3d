@@ -40,7 +40,7 @@ public:
 	void setUniform4f(const std::string& name, float v0, float v1, float v2, float v3) const;
 	void setUniform4f(const std::string& name, glm::vec4 v) const;
 
-	void setUniformMat4fv(const std::string& name, GLsizei count, GLboolean transpose, glm::mat4& value) const;
+	void setUniformMat4fv(const std::string& name, GLboolean transpose, glm::mat4& value) const;
 
 private:
 	GLuint createShader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
