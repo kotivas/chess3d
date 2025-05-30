@@ -168,7 +168,7 @@ namespace Render {
 	}
 
 	void Renderer::genShadowMaps(Scene& scene) {
-		// glCullFace(GL_FRONT);
+		glCullFace(GL_FRONT);
 
 		// light space matrix for directional light
 

@@ -175,9 +175,6 @@ float CalculateOmniShadow(vec3 fragPos, vec3 lightPos, samplerCube shadowCubemap
 
     shadow /= float(samples);
 
-    // display closestDepth as debug (to visualize depth cubemap)
-    // FragColor = vec4(vec3(closestDepth / far_plane), 1.0);
-
     return shadow;
 }
 
@@ -196,7 +193,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir) {
 
     float shadow = CalculateDirectionalShadow(fs_in.DirFragPosLightSpace, dirShadowMap);
 
-    return (ambient + (1.0 - shadow) * (diffuse + specular));
+    return (ambient + (1.0 - shadow) * (diffuse + specular)) * texture(material.diffuse, fs_in.TexCoords).rgb;
 }
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     vec3 lightDir = normalize(light.position - fragPos);
@@ -245,7 +242,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
 
     float shadow = CalculateDirectionalShadow(fs_in.SpotFragPosLightSpace, spotShadowMap);
 
-    return (ambient + (1.0 - shadow) * (diffuse + specular));
+    return (ambient + (1.0 - shadow) * (diffuse + specular)) * texture(material.diffuse, fs_in.TexCoords).rgb;
 }
 
 void main() {
