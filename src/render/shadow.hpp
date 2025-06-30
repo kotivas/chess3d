@@ -6,10 +6,12 @@
 #include <array>
 
 namespace Render {
+
+	// todo BaseShadowData
+
 	struct DirShadowData {
 		DirShadowData()
-			: shader(nullptr), resolution(512), lightSpaceMatrix(0), shadowMap(0), shadowMapFBO(0) {
-		}
+			: shader(nullptr), resolution(512), lightSpaceMatrix(0), shadowMap(0), shadowMapFBO(0) {}
 
 		// should be set manually
 		ShaderPtr shader;
@@ -27,8 +29,7 @@ namespace Render {
 
 	struct SpotShadowData {
 		SpotShadowData()
-			: shader(nullptr), resolution(512), lightSpaceMatrix(0), shadowMap(0), shadowMapFBO(0) {
-		}
+			: shader(nullptr), resolution(512), lightSpaceMatrix(0), shadowMap(0), shadowMapFBO(0) {}
 
 		// should be set manually
 		ShaderPtr shader;
@@ -47,8 +48,7 @@ namespace Render {
 
 	struct OmniShadowData {
 		OmniShadowData()
-			: shader(nullptr), resolution(512), shadowCubemap(0), shadowCubemapFBO(0) {
-		}
+			: shader(nullptr), resolution(512), shadowCubemap(0), shadowCubemapFBO(0) {}
 
 		ShaderPtr shader;
 		uint32_t resolution;

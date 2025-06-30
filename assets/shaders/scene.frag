@@ -4,6 +4,7 @@ out vec4 FragColor;
 struct Material {
     sampler2D diffuse;
     sampler2D specular;
+    sampler2D normal;
     float shininess;
     vec3 solidColor;
     bool useSolidColor;
@@ -51,6 +52,7 @@ in VS_OUT {
     vec3 FragPos;
     vec3 Normal;
     vec2 TexCoords;
+    vec3 Tangent;
     vec4 DirFragPosLightSpace;
     vec4 SpotFragPosLightSpace;
 } fs_in;
@@ -73,33 +75,28 @@ uniform Material material;
 
 // array of offset direction for sampling
 vec3 gridSamplingDisk[20] = vec3[] (
-   vec3(1, 1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1, 1,  1),
-   vec3(1, 1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1, 1, -1),
-   vec3(1, 1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1, 1,  0),
-   vec3(1, 0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1, 0, -1),
-   vec3(0, 1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0, 1, -1)
+vec3(1, 1, 1), vec3(1, -1, 1), vec3(-1, -1, 1), vec3(-1, 1, 1),
+vec3(1, 1, -1), vec3(1, -1, -1), vec3(-1, -1, -1), vec3(-1, 1, -1),
+vec3(1, 1, 0), vec3(1, -1, 0), vec3(-1, -1, 0), vec3(-1, 1, 0),
+vec3(1, 0, 1), vec3(-1, 0, 1), vec3(1, 0, -1), vec3(-1, 0, -1),
+vec3(0, 1, 1), vec3(0, -1, 1), vec3(0, -1, -1), vec3(0, 1, -1)
 );
 
-vec4 simple() {
-    // ambient
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * dirLight.ambient;
+vec3 simple(vec3 normal) {
 
     // diffuse
-    vec3 norm = normalize(fs_in.Normal);
-    vec3 lightDir = dirLight.direction;
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * dirLight.diffuse;
+    vec3 lightDir = -spotLight.direction;
+    float diff = max(dot(normal, lightDir), 0.0);
+    vec3 diffuse = diff * vec3(texture(material.diffuse, fs_in.TexCoords));
 
     // specular
-    float specularStrength = 0.5;
     vec3 viewDir = normalize(viewPos - fs_in.FragPos);
-    vec3 reflectDir = reflect(-lightDir, norm);
+    vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
-    vec3 specular = specularStrength * spec * dirLight.specular;
+    vec3 specular = spec * spotLight.specular;
 
-    vec3 result = (ambient + diffuse + specular) * vec3(texture(material.diffuse, fs_in.TexCoords));
-    return vec4(result, 1.0);
+    vec3 result = (spotLight.ambient + diffuse + specular);
+    return result;
 }
 
 float CalculateDirectionalShadow(vec4 fragPosLightSpace, sampler2D shadowMap) {
@@ -149,16 +146,16 @@ float CalculateOmniShadow(vec3 fragPos, vec3 lightPos, samplerCube shadowCubemap
     // float offset = 0.1;
     // for(float x = -offset; x < offset; x += offset / (samples * 0.5))
     // {
-        // for(float y = -offset; y < offset; y += offset / (samples * 0.5))
-        // {
-            // for(float z = -offset; z < offset; z += offset / (samples * 0.5))
-            // {
-                // float closestDepth = texture(shadowCubemap, fragToLight + vec3(x, y, z)).r; // use lightdir to lookup cubemap
-                // closestDepth *= far_plane;   // Undo mapping [0;1]
-                // if(currentDepth - bias > closestDepth)
-                    // shadow += 1.0;
-            // }
-        // }
+    // for(float y = -offset; y < offset; y += offset / (samples * 0.5))
+    // {
+    // for(float z = -offset; z < offset; z += offset / (samples * 0.5))
+    // {
+    // float closestDepth = texture(shadowCubemap, fragToLight + vec3(x, y, z)).r; // use lightdir to lookup cubemap
+    // closestDepth *= far_plane;   // Undo mapping [0;1]
+    // if(currentDepth - bias > closestDepth)
+    // shadow += 1.0;
+    // }
+    // }
     // }
     // shadow /= (samples * samples * samples);
     float shadow = 0.0;
@@ -166,11 +163,11 @@ float CalculateOmniShadow(vec3 fragPos, vec3 lightPos, samplerCube shadowCubemap
     int samples = 20;
     float viewDistance = length(viewPos - fragPos);
     float diskRadius = (1.0 + (viewDistance / farPlane)) / 25.0;
-    for(int i = 0; i < samples; ++i) {
+    for (int i = 0; i < samples; ++i) {
         float closestDepth = texture(shadowCubemap, fragToLight + gridSamplingDisk[i] * diskRadius).r;
-        closestDepth *= farPlane;   // undo mapping [0;1]
-        if(currentDepth - bias > closestDepth)
-            shadow += 1.0;
+        closestDepth *= farPlane;// undo mapping [0;1]
+        if (currentDepth - bias > closestDepth)
+        shadow += 1.0;
     }
 
     shadow /= float(samples);
@@ -245,16 +242,31 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     return (ambient + (1.0 - shadow) * (diffuse + specular)) * texture(material.diffuse, fs_in.TexCoords).rgb;
 }
 
+vec3 CalcBumpedNormal() {
+    vec3 Normal = normalize(fs_in.Normal);
+    vec3 Tangent = normalize(fs_in.Tangent);
+    Tangent = normalize(Tangent - dot(Tangent, Normal) * Normal);
+    vec3 Bitangent = cross(Tangent, Normal);
+    vec3 BumpMapNormal = texture(material.normal, fs_in.TexCoords).xyz;
+    BumpMapNormal = 2.0 * BumpMapNormal - vec3(1.0, 1.0, 1.0);
+    vec3 NewNormal;
+    mat3 TBN = mat3(Tangent, Bitangent, Normal);
+    NewNormal = TBN * BumpMapNormal;
+    NewNormal = normalize(NewNormal);
+    return NewNormal;
+}
+
 void main() {
     // properties
-    vec3 norm = normalize(fs_in.Normal);
+//    vec3 normal = normalize(fs_in.Normal);
+    vec3 normal = CalcBumpedNormal();
     vec3 viewDir = normalize(viewPos - fs_in.FragPos);
-
     vec3 result = vec3(0);
 
-    if (dirLight.draw)   result += CalcDirLight(dirLight, norm, viewDir);
-    if (pointLight.draw) result += CalcPointLight(pointLight, norm, fs_in.FragPos, viewDir);
-    if (spotLight.draw)  result += CalcSpotLight(spotLight, norm, fs_in.FragPos, viewDir);
+    if (dirLight.draw)   result += CalcDirLight(dirLight, normal, viewDir);
+    if (pointLight.draw) result += CalcPointLight(pointLight, normal, fs_in.FragPos, viewDir);
+    if (spotLight.draw)  result += CalcSpotLight(spotLight, normal, fs_in.FragPos, viewDir);
 
+//    result = simple(normal);
     FragColor = vec4(result, 1.0);
 }

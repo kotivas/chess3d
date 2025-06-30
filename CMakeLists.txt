@@ -10,6 +10,7 @@ find_package(glm REQUIRED)
 find_package(imgui REQUIRED)
 find_package(Stb REQUIRED)
 find_package(assimp REQUIRED)
+find_package(rapidjson REQUIRED)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 	set(CMAKE_CXX_FLAGS_DEBUG "/MDd /ZI /Ob0 /Od /RTC1")

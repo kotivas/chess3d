@@ -42,35 +42,34 @@ static Scene scene{
 	.dirLight{
 		.enable = false,
 		.direction = {-0.5f, -1.0f, -0.5f},
-		.ambient = glm::vec3(0.05f),
-		.diffuse = glm::vec3(0.2f),
-		.specular = glm::vec3(0.2f)
+		.ambient = glm::vec3(0.3f),
+		.diffuse = glm::vec3(0.8f),
+		.specular = glm::vec3(0.5f)
 	},
 	.pointLight{
-		.enable = true,
+		.enable = false,
 		.position = {0.f, 35.f, 0.f},
 
 		.constant = 1.f,
 		// .linear = 0.09f,
 		// .quadratic = 0.032f,
 		.linear = 0,
-		.quadratic = 0.000f,
+		.quadratic = 0.004f,
 
-		.ambient = glm::vec3(0.1f),
-		.diffuse = glm::vec3(0.8f),
-		.specular = glm::vec3(1.f),
+		.ambient = {0.8f, 0.8f, 1.f},
+		.diffuse = {0.6f, 0.6f, 1.f},
+		.specular = {1.f, 1.f, 1.f},
 	},
 	.spotLight{
 		.enable = false,
-		.cutOff = glm::cos(glm::radians(12.5f)), // cos
-		.outerCutOff = glm::cos(glm::radians(17.5f)), // cos
-
 		.position = {3, 45, 30},
 		.direction = {0, -0.5, -0.5},
 
+		.cutOff = glm::cos(glm::radians(12.5f)), // cos
+		.outerCutOff = glm::cos(glm::radians(17.5f)), // cos
+
 		.constant = 1.f,
 		.linear = 0.09f,
-		// .quadratic = 0.032f,
 		.quadratic = 0.001f,
 
 		.ambient = glm::vec3(0.f),
@@ -93,8 +92,11 @@ static Config config{
 
 	// --- GRAPHICS ---
 	.renderDistance = 1000.f,
-	.vsync = false
+	.vsync = true,
+	.fillColor = {0.3, 0.3, 0.3}
 };
+
+static bool FLASHLIGHT = false;
 
 static GLFWwindow* window = nullptr;
 static Render::Renderer* renderer = nullptr;
@@ -132,12 +134,15 @@ void DrawOptions() {
 		if (ImGui::InputInt2("Render Resolution", &config.renderRes[0])) {
 			renderer->updateRenderRes();
 		}
+		ImGui::ColorPicker3("Fill color", &config.fillColor[0]);
 		// if (ImGui::InputInt("Shadow Resolution", &config.shadowRes)) {
 		// renderer->updateShadowRes();
 		// }
 	}
 
 	if (ImGui::CollapsingHeader("Camera Settings")) {
+		ImGui::Text("Position: x: %f, y: %f, z: %f", scene.camera.position.x, scene.camera.position.y,
+		            scene.camera.position.z);
 		ImGui::SliderFloat("Field Of View", &scene.camera.fov, 0, 100, "%.2f");
 		ImGui::InputFloat3("Target", &scene.camera.target[0], "%.2f");
 		ImGui::SliderFloat("Sensitivity", &scene.camera.sens, 0, 10, "%.1f");
@@ -150,7 +155,6 @@ void DrawOptions() {
 			ImGui::BeginDisabled(!scene.dirLight.enable);
 
 			//ImGui::ColorEdit3("Color", &scene.dirLight.color[0]);
-
 			ImGui::InputFloat3("Direction", &scene.dirLight.direction[0]);
 			ImGui::InputFloat3("Ambient", &scene.dirLight.ambient[0]);
 			ImGui::InputFloat3("Diffuse", &scene.dirLight.diffuse[0]);
@@ -206,40 +210,40 @@ void DrawOptions() {
 	}
 
 	if (ImGui::CollapsingHeader("Objects Settings")) {
-		for (const auto& model : scene.models) {
+		for (const auto& model : scene.objects) {
 			if (ImGui::TreeNode(model->name.c_str())) {
 				ImGui::Checkbox("Cast Shadow", &model->castShadow);
 				ImGui::InputFloat3("Scale", &model->transform.scale[0]);
 				ImGui::InputFloat3("Position", &model->transform.position[0]);
 				ImGui::InputFloat3("Rotation", &model->transform.rotation[0]);
-
-				if (ImGui::TreeNode("Meshes")) {
-					if (ImGui::Button("Disable all")) {
-						for (const auto& mesh : model->meshes) { mesh->drawable = false; }
-					}
-					ImGui::SameLine();
-					if (ImGui::Button("Enable all")) {
-						for (const auto& mesh : model->meshes) { mesh->drawable = true; }
-					}
-
-					for (const auto& mesh : model->meshes) {
-						if (ImGui::TreeNode(mesh->name.c_str())) {
-							ImGui::Checkbox("Draw", &mesh->drawable);
-
-							ImGui::BeginDisabled(!mesh->drawable);
-							ImGui::Text(mesh->material->name.c_str());
-
-							ImGui::InputFloat3("Position", &mesh->transform.position[0]);
-							ImGui::SliderFloat3("Scale", &mesh->transform.scale[0], 1, 10, "%.1f");
-							ImGui::InputFloat3("Rotation", &mesh->transform.rotation[0]);
-
-							ImGui::EndDisabled();
-
-							ImGui::TreePop();
-						}
-					}
-					ImGui::TreePop();
-				}
+				//
+				// if (ImGui::TreeNode("Meshes")) {
+				// 	if (ImGui::Button("Disable all")) {
+				// 		for (const auto& mesh : model->meshes) { mesh->drawable = false; }
+				// 	}
+				// 	ImGui::SameLine();
+				// 	if (ImGui::Button("Enable all")) {
+				// 		for (const auto& mesh : model->meshes) { mesh->drawable = true; }
+				// 	}
+				//
+				// 	for (const auto& mesh : model->meshes) {
+				// 		if (ImGui::TreeNode(mesh->name.c_str())) {
+				// 			ImGui::Checkbox("Draw", &mesh->drawable);
+				//
+				// 			ImGui::BeginDisabled(!mesh->drawable);
+				// 			ImGui::Text("Mat: %s", mesh->material->name.c_str());
+				//
+				// 			ImGui::InputFloat3("Position", &mesh->transform.position[0]);
+				// 			ImGui::SliderFloat3("Scale", &mesh->transform.scale[0], 1, 10, "%.1f");
+				// 			ImGui::InputFloat3("Rotation", &mesh->transform.rotation[0]);
+				//
+				// 			ImGui::EndDisabled();
+				//
+				// 			ImGui::TreePop();
+				// 		}
+				// 	}
+				// 	ImGui::TreePop();
+				// }
 				ImGui::TreePop();
 			}
 		}
@@ -346,8 +350,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
 		scene.camera.locked = false;
 		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	}
-	else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
+	} else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
 		scene.camera.locked = true;
 		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
@@ -356,20 +359,23 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, GL_TRUE);
-	}
-	else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
+	} else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
 		scene.camera = Camera();
-	}
-	else if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+	} else if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
 		SaveScreenshot("frame.png");
-	}
-	else if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+	} else if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
 		DEBUG_INFO = !DEBUG_INFO;
+	} else if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+		std::cout << OUT_DEBUG << "Flashlight: " << (FLASHLIGHT ? "on" : "off") << std::endl;
+		FLASHLIGHT = !FLASHLIGHT;
+		scene.spotLight.enable = FLASHLIGHT;
+	} else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+		scene.pointLight.enable = !scene.pointLight.enable;
 	}
 }
 
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-	scene.camera.mouseScrolled(yoffset);
+	scene.camera.mouseScrolled(yoffset, config.renderDistance);
 }
 
 void ResizeCallback(GLFWwindow* window, int width, int height) {
@@ -559,35 +565,14 @@ Render::MeshPtr CreateSphereMesh(float radius, uint32_t stackCount, uint32_t sli
 	return mesh;
 }
 
-Render::ModelPtr CreateLightSphere(float radius, int stackCount, int sliceCount) {
-	Render::ModelPtr model = std::make_unique<Render::Model>();
-	Render::MeshPtr mesh = CreateSphereMesh(radius, stackCount, sliceCount);
-	Render::MaterialPtr mat = std::make_unique<Render::Material>();
-
-	mat->name = "light";
-	mat->solidColor = {1, 1, 1};
-	mat->useSolidColor = true;
-	mat->shininess = 8;
-
-	mat->shader = std::make_shared<Render::Shader>("assets/shaders/light.vert", "assets/shaders/light.frag");
-
-	model->name = "light";
-	model->meshes.push_back(mesh);
-	model->meshes[0]->material = mat;
-
-	return model;
-}
-
-Render::ModelPtr CreatePlane(const std::string& diffuse, float shininess, const std::string& name) {
-	Render::MeshPtr mesh = std::make_unique<Render::Mesh>();;
-	Render::ModelPtr model = std::make_unique<Render::Model>();;
-	Render::MaterialPtr mat = std::make_unique<Render::Material>();
+Render::MeshPtr CreatePlaneMesh(float shininess, const std::string& name) {
+	Render::MeshPtr mesh = std::make_shared<Render::Mesh>();;
+	Render::MaterialPtr mat = std::make_shared<Render::Material>();
 
 	// setup material
 
 	mat->name = name;
-	mat->diffuse[0] = ResourceManager::CreateTexture(diffuse);
-	// mat->specular[0] = ResourceManager::CreateTexture(specular);
+	mat->diffuse[0] = ResourceManager::CreateDefaultTexture({200, 200, 200}, {200, 200, 200}); // TODO solid color
 	mat->shininess = shininess;
 
 	// setup mesh
@@ -606,12 +591,7 @@ Render::ModelPtr CreatePlane(const std::string& diffuse, float shininess, const 
 
 	mesh->setup();
 
-	// setup model
-
-	model->name = name;
-	model->meshes.push_back(mesh);
-
-	return model;
+	return mesh;
 }
 
 void setupScene(bool props) {
@@ -621,45 +601,50 @@ void setupScene(bool props) {
 	                                                            "assets/shaders/scene.frag");
 
 	if (props) {
-		Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
+		// Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
+		Render::MeshPtr lightBulb = CreateSphereMesh(0.1, 32, 32);
 		lightBulb->castShadow = false;
-		scene.models.push_back(lightBulb);
+		lightBulb->name = "LightBulb";
+		lightBulb->material = std::make_shared<Render::Material>();
+		lightBulb->material->shader = std::make_shared<Render::Shader>("assets/shaders/light.vert",
+		                                                               "assets/shaders/light.frag");
+		lightBulb->material->shininess = 255;
+		scene.objects.push_back(lightBulb);
 
-		Render::ModelPtr chainsaw = ResourceManager::LoadModel("assets/models/chainsaw.obj", shader);
-		chainsaw->transform.scale = {0.2, 0.2, 0.2};
-		chainsaw->transform.position = {-10, 20, 0};
-		chainsaw->transform.rotation = {-90, -10, 0};
-		scene.models.push_back(chainsaw);
+		Render::ModelPtr toy = ResourceManager::LoadModel("assets/models/slayer_toy.obj", shader);
+		toy->transform = {
+			.scale = glm::vec3(0.3f),
+			.rotation = {-90, 0, -45},
+			.position = {-5, 16, 0}
+		};
+		scene.objects.push_back(toy);
 
 		// Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/chess.fbx", shader);
-		// chess->transform.position = {7, 16.28, 0};
-		// chess->transform.scale = {0.03, 0.03, 0.03};
-		// scene.models.push_back(chess);
-
-		Render::ModelPtr patch = ResourceManager::LoadModel("assets/models/patch.dae", shader);
-		patch->transform.rotation = {-90, 0, -32};
-		patch->transform.position = {3, 14.58, 3};
-		scene.models.push_back(patch);
+		// chess->transform = {
+		// .position = {-7, 16.28, 0},
+		// .scale = glm::vec3(0.3)
+		// };
+		// scene.objects.push_back(chess);
 
 		Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader);
 		desk->transform.scale = {20, 20, 20};
-		scene.models.push_back(desk);
+		scene.objects.push_back(desk);
 	}
 
 	// create floor
 
-	Render::ModelPtr floor = CreatePlane("assets/textures/woodFloor/wood_floor_diff.png", 8, "Floor");
-	floor->transform.scale = {100, 100, 100};
-	floor->meshes[0]->material->shader = shader;
+	Render::MeshPtr floor = CreatePlaneMesh(8, "floor_plane");
+	floor->transform.scale = glm::vec3(config.renderDistance);
+	floor->material->shader = shader;
 	floor->castShadow = false;
-	scene.models.push_back(floor);
+	scene.objects.push_back(floor);
 }
 
 int main(int argc, char** argv) {
 	InitGLFW();
 	InitIMGUI();
 
-	// TODO make loading screen w/ progresbar
+ 	// TODO make loading screen w/ progresbar
 	setupScene(true);
 
 	renderer = new Render::Renderer(config);
@@ -668,6 +653,7 @@ int main(int argc, char** argv) {
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
 
+	renderer->genShadowMaps(scene);
 	while (!glfwWindowShouldClose(window)) {
 		if (DEBUG_INFO) {
 			frameCount++;
@@ -675,18 +661,31 @@ int main(int argc, char** argv) {
 			indexFPS++;
 			frameCount = 0;
 			lastTime = glfwGetTime();
-
-			scene.spotLight.position = scene.camera.position;
-
-			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
+		}
+		if (scene.pointLight.enable) {
+			// scene.pointLight.position.z = static_cast<float>(sin(glfwGetTime()) * 3.0) * 3; // 3.0 speed, 3 radius
+			// scene.pointLight.position.x = static_cast<float>(cos(glfwGetTime()) * 3.0) * 3;
+			// scene.models[0]->meshes[0]->drawable = true;
+			// scene.models[0]->transform.position = scene.pointLight.position;
+			renderer->genShadowMaps(scene); // some sort of optimization
+		} else {
+			// scene.objects[0]->meshes[0]->drawable = false;
 		}
 
-		scene.models[0]->transform.position = scene.pointLight.position;
+		if (FLASHLIGHT) {
+			scene.spotLight.position = scene.camera.position;
+			scene.spotLight.position.y -= 2;
+			scene.spotLight.position.x -= 2;
 
-		renderer->genShadowMaps(scene);
+			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
+			renderer->genShadowMaps(scene); // some sort of optimization
+		}
+
+		scene.camera.updatePosition();
 		renderer->drawScene(scene);
 		renderer->renderFrame(effects);
 
+		// render imgui
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();

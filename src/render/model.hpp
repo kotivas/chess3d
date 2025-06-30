@@ -9,85 +9,95 @@
 #include "shader.hpp"
 
 namespace Render {
+	struct Vertex {
+		glm::vec3 pos;
+		glm::vec3 normal;
+		glm::vec2 texCoords;
+		glm::vec3 tangent;
+	};
 
-struct Vertex {
-	glm::vec3 pos;
-	glm::vec3 normal;
-	glm::vec2 texCoords;
-	glm::vec3 tangent;
-    glm::vec3 bitangent;
-};
-struct Transform {
-	glm::vec3 position{0};
-	glm::vec3 rotation{0};
-	glm::vec3 scale{1};
+	struct Transform {
+		glm::vec3 position{0};
+		glm::vec3 rotation{0};
+		glm::vec3 scale{1};
 
-	[[nodiscard]] glm::mat4 getMatrix() const {
-		glm::mat4 transform{ 1 };
-		transform = glm::translate(transform, position);
+		[[nodiscard]] glm::mat4 getMatrix() const {
+			glm::mat4 transform{1};
+			transform = glm::translate(transform, position);
 
-		transform = glm::rotate(transform, glm::radians(rotation.x), { 1, 0, 0 });
-		transform = glm::rotate(transform, glm::radians(rotation.y), { 0, 1, 0 });
-		transform = glm::rotate(transform, glm::radians(rotation.z), { 0, 0, 1 });
+			transform = glm::rotate(transform, glm::radians(rotation.x), {1, 0, 0});
+			transform = glm::rotate(transform, glm::radians(rotation.y), {0, 1, 0});
+			transform = glm::rotate(transform, glm::radians(rotation.z), {0, 0, 1});
 
-		transform = glm::scale(transform, scale);
-		return (transform == glm::mat4(0)) ? glm::mat4(1) : transform;
-	}
-};
+			transform = glm::scale(transform, scale);
+			return (transform == glm::mat4(0)) ? glm::mat4(1) : transform;
+		}
+	};
 
-struct Material {
-	std::string name;
+	struct Material {
+		std::string name;
 
-	uint32_t diffuse[3];
-	uint32_t specular[3];
-	uint32_t normal[3];
+		uint32_t diffuse[3];
+		uint32_t specular[3];
+		uint32_t normal[3];
 
-	float shininess{0};
-	ShaderPtr shader;
-	glm::vec3 solidColor;
-	bool useSolidColor{false};
-	//GLuint ior;       // index of refraction
-	//GLuint dissolve;  // 1 == opaque; 0 == fully transparent
-	void apply() const;
-};
-using MaterialPtr = std::shared_ptr<Material>;
+		float shininess{0};
+		ShaderPtr shader;
+		glm::vec3 solidColor;
+		bool useSolidColor{false};
+		//GLuint ior;       // index of refraction
+		//GLuint dissolve;  // 1 == opaque; 0 == fully transparent
+		void apply() const;
+	};
 
-struct Mesh {
-	Mesh() : name("undefined"),
-		VBO(0), VAO(0), EBO(0), drawable(true) {}
+	using MaterialPtr = std::shared_ptr<Material>;
 
-	bool drawable;
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-	Transform transform;
-	std::string name;
-	uint32_t VBO, VAO, EBO;
-	MaterialPtr material;
+	class DrawableObject {
+	public:
+		virtual void draw(const Transform& model) = 0;
+		virtual void draw(const ShaderPtr& shader, const Transform& model) = 0;
 
-	void draw(Transform& model);
-	void draw(const Transform& model, const ShaderPtr& shader);
+		std::string name = "undefined";
+		Transform transform;
+		bool castShadow{true};
 
-	void setup();
-};
-using MeshPtr = std::shared_ptr<Mesh>;
+		virtual ~DrawableObject() = default;
+	};
 
-struct Model {
-	Model() : name("undefined"), castShadow(true) {}
+	using DrawableObjectPtr = std::shared_ptr<DrawableObject>;
 
-	MeshPtr findMeshByName(const std::string& name) const;
+	class Mesh : public DrawableObject {
+	public:
+		Mesh() : drawable(true), VBO(0), VAO(0), EBO(0) {}
 
-	void draw();
-	void draw(const ShaderPtr& shader);
+		bool drawable;
+		std::vector<Vertex> vertices;
+		std::vector<uint32_t> indices;
+		uint32_t VBO, VAO, EBO;
+		MaterialPtr material;
 
-	//std::vector<Material> materials;
-	std::vector<MeshPtr> meshes; // unordered map for quicker search by name
-	std::string name;
-	bool castShadow;
-	Transform transform;
+		void draw(const Transform& model) override;
+		void draw(const ShaderPtr& shader, const Transform& model) override;
 
-	~Model();
-};
+		void setup();
 
-using ModelPtr = std::shared_ptr<Model>;
+		~Mesh() override;
+	};
 
+	using MeshPtr = std::shared_ptr<Mesh>;
+
+	class Model : public DrawableObject {
+	public:
+		Model() = default;
+
+		[[nodiscard]] MeshPtr findMeshByName(const std::string& name) const;
+
+		std::vector<MeshPtr> meshes; // unordered map for quicker search by name
+		void draw(const Transform& model = {}) override;
+		void draw(const ShaderPtr& shader, const Transform& model) override;
+
+		~Model() override;
+	};
+
+	using ModelPtr = std::shared_ptr<Model>;
 }

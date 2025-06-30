@@ -4,12 +4,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 struct Camera {
-
-	void mouseScrolled(double offset);
+	void mouseScrolled(double offset, float max_radius);
 	void mouseMoved(double xpos, double ypos);
 	void updatePosition();
 
-	//inline glm::mat4 getViewMatrix() const { return glm::lookAt(position, target, glm::vec3(0.0f, 1.0f, 0.0f)); }
+	[[nodiscard]] inline glm::mat4 getViewMatrix() const {
+		return glm::lookAt(position, target, glm::vec3(0.0f, 1.0f, 0.0f));
+	}
 
 	glm::vec3 position; // позиция камеры в пространстве
 	glm::vec3 target; // точка в пространстве, вокруг которой вращается камера

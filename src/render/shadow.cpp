@@ -118,17 +118,24 @@ namespace Render {
 	}
 
 	void OmniShadowData::genTransformMatrixes(const glm::vec3 lightPos, float nearPlane, float farPlane) {
-        const glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), (float)resolution / (float)resolution, nearPlane, farPlane);
-        transforms[0] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
-        transforms[1] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
-        transforms[2] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
-        transforms[3] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)));
-        transforms[4] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
-        transforms[5] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+		const glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), (float)resolution / (float)resolution,
+		                                              nearPlane, farPlane);
+		transforms[0] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(1.0f, 0.0f, 0.0f),
+		                                          glm::vec3(0.0f, -1.0f, 0.0f)));
+		transforms[1] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(-1.0f, 0.0f, 0.0f),
+		                                          glm::vec3(0.0f, -1.0f, 0.0f)));
+		transforms[2] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, 1.0f, 0.0f),
+		                                          glm::vec3(0.0f, 0.0f, 1.0f)));
+		transforms[3] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, -1.0f, 0.0f),
+		                                          glm::vec3(0.0f, 0.0f, -1.0f)));
+		transforms[4] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, 0.0f, 1.0f),
+		                                          glm::vec3(0.0f, -1.0f, 0.0f)));
+		transforms[5] = (shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0.0f, 0.0f, -1.0f),
+		                                          glm::vec3(0.0f, -1.0f, 0.0f)));
 	}
 
 	OmniShadowData::~OmniShadowData() {
-		// delete cubemap
+		glDeleteTextures(1, &shadowCubemap);
 		glDeleteFramebuffers(1, &shadowCubemapFBO);
 	}
 }

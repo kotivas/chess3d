@@ -10,4 +10,5 @@ struct Config {
 	// --- GRAPHICS ---
 	float renderDistance;
 	bool vsync;
+	glm::vec3 fillColor;
 };

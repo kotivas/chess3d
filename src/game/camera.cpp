@@ -2,13 +2,13 @@
 
 #include <iostream>
 
-void Camera::mouseScrolled(double offset) {
-	if (radius >= 1.f && radius <= 100.f)
+void Camera::mouseScrolled(double offset, float max_radius) {
+	if (radius >= 1.f && radius <= max_radius)
 		radius -= offset;
 	if (radius <= 1.f)
 		radius = 1.f;
-	if (radius >= 100.f)
-		radius = 100.f;
+	if (radius >= max_radius)
+		radius = max_radius;
 }
 
 void Camera::updatePosition() {
@@ -20,14 +20,13 @@ void Camera::updatePosition() {
 }
 
 void Camera::mouseMoved(double xpos, double ypos) {
-
 	float xoffset = xpos - lastx;
-	float yoffset = ypos - lasty;  // Reversed since y-coordinates go from bottom to top
+	float yoffset = ypos - lasty; // Reversed since y-coordinates go from bottom to top
 
 	lastx = xpos;
 	lasty = ypos;
 
-	if ( locked ) return; 
+	if (locked) return;
 
 	xoffset *= sens;
 	yoffset *= sens;
@@ -38,6 +37,4 @@ void Camera::mouseMoved(double xpos, double ypos) {
 	// Ограничение pitch, чтобы камера не переворачивалась
 	if (pitch > 89.0f) pitch = 89.0f;
 	if (pitch < -89.0f) pitch = -89.0f;
-
-	//if (pitch <= 1) pitch = 1; // не проходить через пол
 }

@@ -12,60 +12,59 @@
 #include "shadow.hpp"
 
 namespace Render {
+	struct PostEffects {
+		bool quantization;
+		int quantizationLevel;
 
-struct PostEffects {
-	bool quantization;
-	int quantizationLevel;
+		bool vignette;
+		float vignetteIntensity;
+		glm::vec3 vignetteColor;
+	};
 
-	bool vignette;
-	float vignetteIntensity;
-	glm::vec3 vignetteColor;
-};
+	class Renderer {
+	public:
+		Renderer(Config& config);
 
-class Renderer {
-public:
-	Renderer(Config& config);
+		// render shadow map from light position
+		void genShadowMaps(Scene& scene);
 
-	// render shadow map from light position
-	void genShadowMaps(Scene& scene);
+		// draw scene to the FBO
+		void drawScene(Scene& scene);
 
-	// draw scene to the FBO
-	void drawScene(Scene& scene);
+		// applying post fx and rendering to the screen FBO
+		void renderFrame(PostEffects effects);
 
-	// applying post fx and rendering to the screen FBO
-	void renderFrame(PostEffects effects);
+		void updateShadowRes();
+		void updateRenderRes();
 
-	void updateShadowRes();
-	void updateRenderRes();
+		~Renderer();
 
-	~Renderer();
+	private:
+		//GLFWwindow* window;
 
-private:
-	//GLFWwindow* window;
+		void renderClear();
 
-	void renderClear();
+		void createFrameBuffer();
+		void createQuadVAO();
+		void createUBO();
 
-	void createFrameBuffer();
-	void createQuadVAO();
-	void createUBO();
+		void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& dirLightSpaceMatrix,
+		                       const glm::mat4& spotLightSpaceMatrix);
+		void updateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
+		void UpdateUBOData(const glm::vec3& viewPos);
 
-	void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& dirLightSpaceMatrix, const glm::mat4& spotLightSpaceMatrix);
-	void updateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
-	void UpdateUBOData(const glm::vec3& viewPos);
-		
-	Shader postfxShader;
+		Shader postfxShader;
 
-	Config& config;
+		Config& config;
 
-	uint32_t FBO, RBO;
-	uint32_t UBOMatrices, UBOLights, UBOData;
+		uint32_t FBO, RBO;
+		uint32_t UBOMatrices, UBOLights, UBOData;
 
-	DirShadowData dirShadow;
-	SpotShadowData spotShadow;
-	OmniShadowData pointShadow;
+		DirShadowData dirShadow;
+		SpotShadowData spotShadow;
+		OmniShadowData pointShadow;
 
-	uint32_t quadVAO, quadVBO;
-	uint32_t textureColorBuffer;
-};
-
+		uint32_t quadVAO, quadVBO;
+		uint32_t textureColorBuffer;
+	};
 }

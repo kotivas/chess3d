@@ -10,7 +10,6 @@ namespace Render {
 		glViewport(0, 0, config.windowRes.x, config.windowRes.y);
 
 		glEnable(GL_FRAMEBUFFER_SRGB); // gamma correction
-
 		glEnable(GL_DEPTH_TEST);
 
 		glEnable(GL_CULL_FACE); // Включаем отсечение задних граней
@@ -47,8 +46,9 @@ namespace Render {
 		// create a color attachment texture
 		glGenTextures(1, &textureColorBuffer);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, config.renderRes.x, config.renderRes.y, 0, GL_RGB, GL_UNSIGNED_BYTE,
-		             NULL);
+		// glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, config.renderRes.x, config.renderRes.y, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, config.renderRes.x, config.renderRes.y, 0, GL_RGBA, GL_FLOAT, NULL);
+
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glBindTexture(GL_TEXTURE_2D, 0);
@@ -128,7 +128,7 @@ namespace Render {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 
 		//glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClearColor(config.fillColor.r, config.fillColor.g, config.fillColor.b, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -183,8 +183,8 @@ namespace Render {
 			dirShadow.shader->use();
 			dirShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, dirShadow.lightSpaceMatrix);
 
-			for (auto& model : scene.models) {
-				if (model->castShadow) model->draw(dirShadow.shader);
+			for (auto& object : scene.objects) {
+				if (object->castShadow) object->draw(dirShadow.shader, {});
 			}
 		}
 		if (scene.spotLight.enable) {
@@ -199,8 +199,8 @@ namespace Render {
 			spotShadow.shader->use();
 			spotShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, spotShadow.lightSpaceMatrix);
 
-			for (auto& model : scene.models) {
-				if (model->castShadow) model->draw(spotShadow.shader);
+			for (auto& object : scene.objects) {
+				if (object->castShadow) object->draw(spotShadow.shader, {});
 			}
 		}
 		if (scene.pointLight.enable) {
@@ -224,8 +224,8 @@ namespace Render {
 			pointShadow.shader->setUniform1f("far_plane", config.renderDistance);
 			pointShadow.shader->setUniform3f("lightPos", scene.pointLight.position);
 
-			for (auto& model : scene.models) {
-				if (model->castShadow) model->draw(pointShadow.shader);
+			for (auto& object : scene.objects) {
+				if (object->castShadow) object->draw(pointShadow.shader, {});
 			}
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -242,14 +242,12 @@ namespace Render {
 
 	void Renderer::drawScene(Scene& scene) {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO); // draw everything in custom framebuffer
-		scene.camera.updatePosition();
 
 		updateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
 		UpdateUBOData(scene.camera.position);
 		updateUBOMatrices(
 			glm::perspective(glm::radians(scene.camera.fov), (float)config.windowRes.x / (float)config.windowRes.y,
-			                 0.1f, config.renderDistance),
-			glm::lookAt(scene.camera.position, scene.camera.target, glm::vec3(0.0f, 1.0f, 0.0f)),
+			                 0.1f, config.renderDistance), scene.camera.getViewMatrix(),
 			dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix
 		);
 
@@ -262,8 +260,8 @@ namespace Render {
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
 
-		for (auto& model : scene.models) {
-			model->draw();
+		for (auto& object : scene.objects) {
+			object->draw({});
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0); // set default framebuffer
@@ -286,8 +284,6 @@ namespace Render {
 
 		glBindVertexArray(quadVAO);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-		// glBindTexture(GL_TEXTURE_2D, spotShadow.shadowMap);
-		// glBindTexture(GL_TEXTURE_2D, dirShadow.shadowMap);
 		// use the color attachment texture as the texture of the quad plane
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -315,8 +311,7 @@ namespace Render {
 
 	void Renderer::updateRenderRes() {
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, config.renderRes.x, config.renderRes.y, 0, GL_RGB, GL_UNSIGNED_BYTE,
-		             NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, config.renderRes.x, config.renderRes.y, 0, GL_RGBA, GL_FLOAT, NULL);
 
 		glBindRenderbuffer(GL_RENDERBUFFER, RBO);
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, config.renderRes.x, config.renderRes.y);

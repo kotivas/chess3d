@@ -12,17 +12,17 @@
 namespace ResourceManager {
 	static uint32_t defaultTexture;
 
-	uint32_t CreateDefaultTexture() {
+	uint32_t CreateDefaultTexture(glm::ivec3 color1, glm::ivec3 color2) {
 		// Создание данных для текстуры 2x2 RGBA
 		unsigned char textureData[2 * 2 * 4] = {
 			// BLACK (0, 0, 0, 255)
-			0, 0, 0, 255,
+			(uint8_t)color1.r, (uint8_t)color1.g, (uint8_t)color1.b, 255,
 			// MAGENTA (255, 0, 255, 255)
-			255, 0, 255, 255,
+			(uint8_t)color2.r, (uint8_t)color2.g, (uint8_t)color2.b, 255,
 			// BLACK (0, 0, 0, 255)
-			0, 0, 0, 255,
+			(uint8_t)color1.r, (uint8_t)color1.g, (uint8_t)color1.b, 255,
 			// MAGENTA (255, 0, 255, 255)
-			255, 0, 255, 255
+			(uint8_t)color2.r, (uint8_t)color2.g, (uint8_t)color2.b, 255
 		};
 
 		// Генерация текстуры в OpenGL
@@ -95,12 +95,8 @@ namespace ResourceManager {
 			if (aiMesh->HasTangentsAndBitangents()) {
 				// mTangents/ mBittangetnts
 				vertex.tangent.x = aiMesh->mTangents[j].x;
-				vertex.tangent.x = aiMesh->mTangents[j].y;
-				vertex.tangent.x = aiMesh->mTangents[j].z;
-
-				vertex.bitangent.x = aiMesh->mBitangents[j].x;
-				vertex.bitangent.x = aiMesh->mBitangents[j].y;
-				vertex.bitangent.x = aiMesh->mBitangents[j].z;
+				vertex.tangent.y = aiMesh->mTangents[j].y;
+				vertex.tangent.z = aiMesh->mTangents[j].z;
 			}
 
 			// Нормали
@@ -165,39 +161,35 @@ namespace ResourceManager {
 		aiString diffuseTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexPath) == AI_SUCCESS) {
 			nmat->diffuse[0] = CreateTexture(diffuseTexPath.C_Str());
-		}
-		else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png")) {
+		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png")) {
 			// assets/textures/desk/BaseColor.png
 			nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png");
-		}
-		else {
+		} else {
 			std::cout << OUT_WARNING << "No diffuse texture for material: " << nmat->name;
 			std::cout << " (unable to find at path " << "assets/textures/" + modelName + "/" + nmat->name +
 				"_diffuse.png)" << std::endl;
-			nmat->diffuse[0] = CreateDefaultTexture();
+			nmat->diffuse[0] = CreateDefaultTexture({0, 0, 0}, {255, 0, 255});
 		}
 
 		aiString specularTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_SPECULAR, 0, &specularTexPath) == AI_SUCCESS) {
 			nmat->specular[0] = CreateTexture(specularTexPath.C_Str());
-		}
-		else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_specular.png")) {
+		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_specular.png")) {
 			nmat->specular[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_specular.png");
 		}
 
 		aiString normalTexPath;
-		if (aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &normalTexPath) == AI_SUCCESS) {
-			// nmat->normal[0] = CreateTexture(normalTexPath.C_Str());
-		}
-		else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_normal.png")) {
-			// nmat->normal[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_normal.png");
+		if (aiMaterial->GetTexture(aiTextureType_HEIGHT, 0, &normalTexPath) == AI_SUCCESS) {
+			nmat->normal[0] = CreateTexture(normalTexPath.C_Str());
+		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_normal.png")) {
+			nmat->normal[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_normal.png");
 		}
 
 		return nmat;
 	}
 
 	Render::ModelPtr LoadModel(const std::string& path, Render::ShaderPtr shader) {
-		defaultTexture = CreateDefaultTexture();
+		defaultTexture = CreateDefaultTexture({0, 0, 0}, {255, 0, 255});
 
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(

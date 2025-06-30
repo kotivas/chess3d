@@ -19,15 +19,21 @@ namespace Render {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
 
-		// Настройка атрибутов вершин
+		// Настройка атрибута позиции
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, pos));
 
+		// Настройка атрибута нормали
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
 
+		// Настройка атрибута текстурных координат
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoords));
+
+		// Настройка атрибута тангента
+		glEnableVertexAttribArray(3);
+		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
 
 		glBindVertexArray(0);
 	}
@@ -40,6 +46,8 @@ namespace Render {
 		glBindTexture(GL_TEXTURE_2D, diffuse[0]);
 		glActiveTexture(GL_TEXTURE4);
 		glBindTexture(GL_TEXTURE_2D, specular[0]);
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_2D, normal[0]);
 
 		shader->use();
 
@@ -53,9 +61,10 @@ namespace Render {
 		shader->setUniform1i("omniShadowMap", 2);
 		shader->setUniform1i("material.diffuse", 3);
 		shader->setUniform1i("material.specular", 4);
+		shader->setUniform1i("material.normal", 5);
 	}
 
-	void Mesh::draw(Transform& model) {
+	void Mesh::draw(const Transform& model) {
 		assert(material);
 
 		material->apply();
@@ -71,7 +80,7 @@ namespace Render {
 		glActiveTexture(GL_TEXTURE0);
 	}
 
-	void Mesh::draw(const Transform& model, const ShaderPtr& shader) {
+	void Mesh::draw(const ShaderPtr& shader, const Transform& model) {
 		assert(material);
 
 		shader->use();
@@ -84,15 +93,22 @@ namespace Render {
 		glBindVertexArray(0);
 	}
 
-	void Model::draw(const ShaderPtr& shader) {
+	Mesh::~Mesh() {
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
+		glDeleteBuffers(1, &EBO);
+	}
+
+
+	void Model::draw(const ShaderPtr& shader, const Transform& model) {
 		for (const MeshPtr& mesh : meshes) {
 			if (mesh->drawable) {
-				mesh->draw(this->transform, shader);
+				mesh->draw(shader, this->transform);
 			}
 		}
 	}
 
-	void Model::draw() {
+	void Model::draw(const Transform& model) {
 		for (const MeshPtr& mesh : meshes) {
 			if (mesh->drawable) {
 				mesh->draw(this->transform);
@@ -113,7 +129,6 @@ namespace Render {
 
 	Model::~Model() {
 		std::cout << OUT_WARNING << "Model " << name << " destructed" << std::endl;
-
 		meshes.clear();
 	}
 }
