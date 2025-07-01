@@ -40,7 +40,7 @@ static Scene scene{
 		.locked = true
 	},
 	.dirLight{
-		.enable = false,
+		.enable = true,
 		.direction = {-0.5f, -1.0f, -0.5f},
 		.ambient = glm::vec3(0.3f),
 		.diffuse = glm::vec3(0.8f),
@@ -78,8 +78,8 @@ static Scene scene{
 	}
 };
 static Render::PostEffects effects{
-	.quantization = false,
-	.quantizationLevel = 4,
+	.quantization = true,
+	.quantizationLevel = 128,
 
 	.vignette = true,
 	.vignetteIntensity = 0.25f,
@@ -87,11 +87,11 @@ static Render::PostEffects effects{
 };
 static Config config{
 	.windowRes = {1280, 720},
-	.renderRes = {1920, 1080}, // 320, 240
-	.shadowRes = 2048,
+	.renderRes = {800, 600}, // 320, 240
+	.shadowRes = 1024,
 
 	// --- GRAPHICS ---
-	.renderDistance = 1000.f,
+	.renderDistance = 500.f,
 	.vsync = true,
 	.fillColor = {0.3, 0.3, 0.3}
 };
@@ -210,40 +210,41 @@ void DrawOptions() {
 	}
 
 	if (ImGui::CollapsingHeader("Objects Settings")) {
-		for (const auto& model : scene.objects) {
-			if (ImGui::TreeNode(model->name.c_str())) {
-				ImGui::Checkbox("Cast Shadow", &model->castShadow);
-				ImGui::InputFloat3("Scale", &model->transform.scale[0]);
-				ImGui::InputFloat3("Position", &model->transform.position[0]);
-				ImGui::InputFloat3("Rotation", &model->transform.rotation[0]);
-				//
-				// if (ImGui::TreeNode("Meshes")) {
-				// 	if (ImGui::Button("Disable all")) {
-				// 		for (const auto& mesh : model->meshes) { mesh->drawable = false; }
-				// 	}
-				// 	ImGui::SameLine();
-				// 	if (ImGui::Button("Enable all")) {
-				// 		for (const auto& mesh : model->meshes) { mesh->drawable = true; }
-				// 	}
-				//
-				// 	for (const auto& mesh : model->meshes) {
-				// 		if (ImGui::TreeNode(mesh->name.c_str())) {
-				// 			ImGui::Checkbox("Draw", &mesh->drawable);
-				//
-				// 			ImGui::BeginDisabled(!mesh->drawable);
-				// 			ImGui::Text("Mat: %s", mesh->material->name.c_str());
-				//
-				// 			ImGui::InputFloat3("Position", &mesh->transform.position[0]);
-				// 			ImGui::SliderFloat3("Scale", &mesh->transform.scale[0], 1, 10, "%.1f");
-				// 			ImGui::InputFloat3("Rotation", &mesh->transform.rotation[0]);
-				//
-				// 			ImGui::EndDisabled();
-				//
-				// 			ImGui::TreePop();
-				// 		}
-				// 	}
-				// 	ImGui::TreePop();
-				// }
+		for (Render::DrawableObjectPtr obj : scene.objects) {
+			if (ImGui::TreeNode(obj->name.c_str())) {
+				ImGui::Checkbox("Cast Shadow", &obj->castShadow);
+				ImGui::InputFloat3("Scale", &obj->transform.scale[0]);
+				ImGui::InputFloat3("Position", &obj->transform.position[0]);
+				ImGui::InputFloat3("Rotation", &obj->transform.rotation[0]);
+
+				Render::ModelPtr model = std::dynamic_pointer_cast<Render::Model>(obj);
+				if (ImGui::TreeNode("Meshes")) {
+					if (ImGui::Button("Disable all")) {
+						for (const auto& mesh : model->meshes) { mesh->drawable = false; }
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Enable all")) {
+						for (const auto& mesh : model->meshes) { mesh->drawable = true; }
+					}
+
+					for (const auto& mesh : model->meshes) {
+						if (ImGui::TreeNode(mesh->name.c_str())) {
+							ImGui::Checkbox("Draw", &mesh->drawable);
+
+							ImGui::BeginDisabled(!mesh->drawable);
+							ImGui::Text("Mat: %s", mesh->material->name.c_str());
+
+							ImGui::InputFloat3("Position", &mesh->transform.position[0]);
+							ImGui::SliderFloat3("Scale", &mesh->transform.scale[0], 1, 10, "%.1f");
+							ImGui::InputFloat3("Rotation", &mesh->transform.rotation[0]);
+
+							ImGui::EndDisabled();
+
+							ImGui::TreePop();
+						}
+					}
+					ImGui::TreePop();
+				}
 				ImGui::TreePop();
 			}
 		}
@@ -619,7 +620,7 @@ void setupScene(bool props) {
 		};
 		scene.objects.push_back(toy);
 
-		// Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/chess.fbx", shader);
+		// Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/untitled.obj", shader);
 		// chess->transform = {
 		// .position = {-7, 16.28, 0},
 		// .scale = glm::vec3(0.3)
@@ -644,7 +645,7 @@ int main(int argc, char** argv) {
 	InitGLFW();
 	InitIMGUI();
 
- 	// TODO make loading screen w/ progresbar
+	// TODO make loading screen w/ progresbar
 	setupScene(true);
 
 	renderer = new Render::Renderer(config);
@@ -653,8 +654,9 @@ int main(int argc, char** argv) {
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
 
-	renderer->genShadowMaps(scene);
 	while (!glfwWindowShouldClose(window)) {
+		renderer->genShadowMaps(scene);
+
 		if (DEBUG_INFO) {
 			frameCount++;
 			FPS[indexFPS] = frameCount / (glfwGetTime() - lastTime);
@@ -662,23 +664,12 @@ int main(int argc, char** argv) {
 			frameCount = 0;
 			lastTime = glfwGetTime();
 		}
-		if (scene.pointLight.enable) {
-			// scene.pointLight.position.z = static_cast<float>(sin(glfwGetTime()) * 3.0) * 3; // 3.0 speed, 3 radius
-			// scene.pointLight.position.x = static_cast<float>(cos(glfwGetTime()) * 3.0) * 3;
-			// scene.models[0]->meshes[0]->drawable = true;
-			// scene.models[0]->transform.position = scene.pointLight.position;
-			renderer->genShadowMaps(scene); // some sort of optimization
-		} else {
-			// scene.objects[0]->meshes[0]->drawable = false;
-		}
 
 		if (FLASHLIGHT) {
 			scene.spotLight.position = scene.camera.position;
 			scene.spotLight.position.y -= 2;
 			scene.spotLight.position.x -= 2;
-
 			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
-			renderer->genShadowMaps(scene); // some sort of optimization
 		}
 
 		scene.camera.updatePosition();
