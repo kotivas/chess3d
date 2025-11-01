@@ -62,14 +62,14 @@ namespace ResourceManager {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		// Load image, create texture and generate mipmaps
-		unsigned char* image = stbi_load(path.c_str(), &width, &height, 0, 3);
+		unsigned char* image = stbi_load(path.c_str(), &width, &height, 0, STBI_rgb_alpha);
 
 		if (!image) {
 			std::cout << OUT_WARNING << "Unable to load " << path << " - " << stbi_failure_reason() << std::endl;
 			return defaultTexture;
 		}
 
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 		glGenerateMipmap(GL_TEXTURE_2D);
 
 		stbi_image_free(image);
@@ -91,13 +91,6 @@ namespace ResourceManager {
 			vertex.pos.x = aiMesh->mVertices[j].x;
 			vertex.pos.y = aiMesh->mVertices[j].y;
 			vertex.pos.z = aiMesh->mVertices[j].z;
-
-			if (aiMesh->HasTangentsAndBitangents()) {
-				// mTangents/ mBittangetnts
-				vertex.tangent.x = aiMesh->mTangents[j].x;
-				vertex.tangent.y = aiMesh->mTangents[j].y;
-				vertex.tangent.z = aiMesh->mTangents[j].z;
-			}
 
 			// Нормали
 			if (aiMesh->HasNormals()) {
@@ -153,36 +146,16 @@ namespace ResourceManager {
 		aiMaterial->Get(AI_MATKEY_NAME, matName);
 		nmat->name = matName.C_Str();
 
-		float shininess;
-		aiMaterial->Get(AI_MATKEY_SHININESS, shininess);
-		nmat->shininess = shininess;
-		if (nmat->shininess == 0) nmat->shininess = 32.f;
-
 		aiString diffuseTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexPath) == AI_SUCCESS) {
-			nmat->diffuse[0] = CreateTexture(diffuseTexPath.C_Str());
-		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png")) {
+			nmat->baseColor = CreateTexture(diffuseTexPath.C_Str());
+		} else if (std::filesystem::exists("assets/textures/" + modelName + "_diffuse.png")) {
 			// assets/textures/desk/BaseColor.png
-			nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png");
+			nmat->baseColor = CreateTexture("assets/textures/" + modelName + "_diffuse.png");
 		} else {
 			std::cout << OUT_WARNING << "No diffuse texture for material: " << nmat->name;
-			std::cout << " (unable to find at path " << "assets/textures/" + modelName + "/" + nmat->name +
-				"_diffuse.png)" << std::endl;
-			nmat->diffuse[0] = CreateDefaultTexture({0, 0, 0}, {255, 0, 255});
-		}
-
-		aiString specularTexPath;
-		if (aiMaterial->GetTexture(aiTextureType_SPECULAR, 0, &specularTexPath) == AI_SUCCESS) {
-			nmat->specular[0] = CreateTexture(specularTexPath.C_Str());
-		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_specular.png")) {
-			nmat->specular[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_specular.png");
-		}
-
-		aiString normalTexPath;
-		if (aiMaterial->GetTexture(aiTextureType_HEIGHT, 0, &normalTexPath) == AI_SUCCESS) {
-			nmat->normal[0] = CreateTexture(normalTexPath.C_Str());
-		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_normal.png")) {
-			nmat->normal[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_normal.png");
+			std::cout << " (unable to find at path " << "assets/textures/" + modelName + "_diffuse.png)" << std::endl;
+			nmat->baseColor = CreateDefaultTexture({0, 0, 0}, {255, 0, 255});
 		}
 
 		return nmat;
@@ -221,7 +194,7 @@ namespace ResourceManager {
 		if (scene->mNumMaterials == 0) {
 			std::cout << OUT_WARNING << "No materials found in model" << std::endl;
 			Render::MaterialPtr nmat = std::make_shared<Render::Material>();
-			nmat->diffuse[0] = defaultTexture;
+			nmat->baseColor = defaultTexture;
 			nmat->name = "default";
 			nmat->shader = shader;
 			nmats.push_back(nmat);

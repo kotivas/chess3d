@@ -1,5 +1,7 @@
 #include "renderer.hpp"
 
+#include "../game/resource_manager.hpp"
+
 namespace Render {
 	Renderer::Renderer(Config& config)
 		: config(config), FBO(0), RBO(0),
@@ -9,31 +11,22 @@ namespace Render {
 
 		glViewport(0, 0, config.windowRes.x, config.windowRes.y);
 
-		glEnable(GL_FRAMEBUFFER_SRGB); // gamma correction
-		glEnable(GL_DEPTH_TEST);
+		// glEnable(GL_FRAMEBUFFER_SRGB); // gamma correction
+		// glEnable(GL_DEPTH_TEST);
 
 		glEnable(GL_CULL_FACE); // Включаем отсечение задних граней
 		glCullFace(GL_BACK); // Указываем, какие грани отсекать (задние)
 		glFrontFace(GL_CCW); // Указываем порядок вершин для лицевых граней (CCW по умолчанию)
 
-		// work with shadows
-		ShaderPtr dirShader = std::make_shared<Render::Shader>("assets/shaders/depth.vert",
-		                                                       "assets/shaders/depth.frag");
-		spotShadow.shader = dirShader;
-		spotShadow.resolution = config.shadowRes; // todo maybe i should split it
-		spotShadow.generate();
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-		dirShadow.shader = dirShader;
-		dirShadow.resolution = config.shadowRes;
-		dirShadow.generate();
+		uint32_t shadow_tex = ResourceManager::CreateTexture("assets/textures/shadow.png");
+		ShaderPtr shader = std::make_shared<Shader>("assets/shaders/shadow.vert",
+		                                            "assets/shaders/shadow.frag");
 
-		ShaderPtr omniShader = std::make_shared<Render::Shader>("assets/shaders/point_shadow_depth.vert",
-		                                                        "assets/shaders/point_shadow_depth.frag",
-		                                                        "assets/shaders/point_shadow_depth.geom");
-
-		pointShadow.shader = omniShader;
-		pointShadow.resolution = config.shadowRes;
-		pointShadow.generate();
+		shadow = std::make_shared<Sprite>(shadow_tex);
+		shadow->shader = shader;
 
 		createFrameBuffer();
 		createQuadVAO();
@@ -96,24 +89,21 @@ namespace Render {
 		glGenBuffers(1, &UBOMatrices);
 
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
-		glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+		glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, 4 * sizeof(glm::mat4));
-		// ====== LIGHTS ======
-		glGenBuffers(1, &UBOLights);
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, 2 * sizeof(glm::mat4));
+		// ====== LIGHT ======
+		glGenBuffers(1, &UBOLight);
 
-		static_assert(sizeof(DirLight) == 80);
-		static_assert(sizeof(PointLight) == 96);
-		static_assert(sizeof(SpotLight) == 112);
+		static_assert(sizeof(Light) == 64);
 
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(DirLight) + sizeof(PointLight) + sizeof(SpotLight), NULL,
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOLight);
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(Light), NULL,
 		             GL_STATIC_DRAW);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, UBOLights, 0,
-		                  sizeof(DirLight) + sizeof(PointLight) + sizeof(SpotLight));
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, UBOLight, 0, sizeof(Light));
 		// ====== DATA ======
 		glGenBuffers(1, &UBOData);
 
@@ -127,33 +117,25 @@ namespace Render {
 	void Renderer::renderClear() {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 
-		//glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 		glClearColor(config.fillColor.r, config.fillColor.g, config.fillColor.b, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
-	void Renderer::updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view,
-	                                 const glm::mat4& dirLightSpaceMatrix, const glm::mat4& spotLightSpaceMatrix) {
+	void Renderer::updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view) {
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
 		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4),
-		                glm::value_ptr(dirLightSpaceMatrix));
-		glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), sizeof(glm::mat4),
-		                glm::value_ptr(spotLightSpaceMatrix));
 
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
-	void Renderer::updateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight) {
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
+	void Renderer::updateUBOLight(Light& light) {
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOLight);
 
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(DirLight), &dirLight);
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(DirLight), sizeof(PointLight), &pointLight);
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(DirLight) + sizeof(PointLight), sizeof(spotLight), &spotLight);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(light), &light);
 
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
@@ -167,101 +149,30 @@ namespace Render {
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
-	void Renderer::genShadowMaps(Scene& scene) {
-		glCullFace(GL_FRONT);
-
-		// light space matrix for directional light
-
-		if (scene.dirLight.enable) {
-			dirShadow.calculateLightSpaceMatrix(scene.dirLight.direction, 0.1f, config.renderDistance);
-
-			// render scene from light's point of view
-			glViewport(0, 0, dirShadow.resolution, dirShadow.resolution);
-			glBindFramebuffer(GL_FRAMEBUFFER, dirShadow.shadowMapFBO);
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			dirShadow.shader->use();
-			dirShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, dirShadow.lightSpaceMatrix);
-
-			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(dirShadow.shader, {});
-			}
-		}
-		if (scene.spotLight.enable) {
-			spotShadow.calculateLightSpaceMatrix(scene.spotLight.position, scene.spotLight.direction,
-			                                     scene.spotLight.outerCutOff, 0.1f, config.renderDistance);
-
-			// render scene from light's point of view
-			glViewport(0, 0, spotShadow.resolution, spotShadow.resolution);
-			glBindFramebuffer(GL_FRAMEBUFFER, spotShadow.shadowMapFBO);
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			spotShadow.shader->use();
-			spotShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, spotShadow.lightSpaceMatrix);
-
-			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(spotShadow.shader, {});
-			}
-		}
-		if (scene.pointLight.enable) {
-			pointShadow.genTransformMatrixes(scene.pointLight.position, 0.1f, config.renderDistance);
-
-			// render scene from light's point of view
-			glViewport(0, 0, pointShadow.resolution, pointShadow.resolution);
-			glBindFramebuffer(GL_FRAMEBUFFER, pointShadow.shadowCubemapFBO);
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			pointShadow.shader->use();
-
-			// TODO возможно я могу как то сделать, что бы за раз передавать 6 матриц
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[0]", false, pointShadow.transforms[0]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[1]", false, pointShadow.transforms[1]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[2]", false, pointShadow.transforms[2]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[3]", false, pointShadow.transforms[3]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[4]", false, pointShadow.transforms[4]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[5]", false, pointShadow.transforms[5]);
-
-			pointShadow.shader->setUniform1f("far_plane", config.renderDistance);
-			pointShadow.shader->setUniform3f("lightPos", scene.pointLight.position);
-
-			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(pointShadow.shader, {});
-			}
-
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-		// reset viewport
-		glViewport(0, 0, config.renderRes.x, config.renderRes.y);
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glCullFace(GL_BACK);
-	}
-
 	void Renderer::drawScene(Scene& scene) {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO); // draw everything in custom framebuffer
 
-		updateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
+		updateUBOLight(scene.light);
 		UpdateUBOData(scene.camera.position);
 		updateUBOMatrices(
 			glm::perspective(glm::radians(scene.camera.fov), (float)config.windowRes.x / (float)config.windowRes.y,
-			                 0.1f, config.renderDistance), scene.camera.getViewMatrix(),
-			dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix
-		);
+			                 0.1f, config.renderDistance), scene.camera.getViewMatrix());
 
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, dirShadow.shadowMap);
-
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, spotShadow.shadowMap);
-
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
 
 		for (auto& object : scene.objects) {
 			object->draw({});
+		}
+
+		for (auto& object : scene.objects) {
+			if (!object->castShadow) continue;
+			Transform transform;
+			transform.position = object->transform.position;
+			transform.scale = object->transform.scale * glm::vec3(20);
+			shadow->draw(transform);
+
+			// glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(objX, floorY + 0.01f, objZ));
+			// model = glm::scale(model, glm::vec3(1.5f, 1.0f, 1.5f));
+			// shader.setMat4("model", model);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0); // set default framebuffer
@@ -292,22 +203,6 @@ namespace Render {
 		renderClear();
 	}
 
-
-	// void Renderer::updateShadowRes() {
-	// 	glBindTexture(GL_TEXTURE_2D, dirShadowMap);
-	// 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-	// 	             config.shadowRes, config.shadowRes, 0,
-	// 	             GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-	//
-	// 	// check FBO status
-	// 	glBindFramebuffer(GL_FRAMEBUFFER, dirShadowMapFBO);
-	// 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	// 	if (status != GL_FRAMEBUFFER_COMPLETE) {
-	// 		std::cerr << "Shadow FBO incomplete after resize! Status: 0x"
-	// 			<< std::hex << status << std::dec << std::endl;
-	// 	}
-	// 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	// }
 
 	void Renderer::updateRenderRes() {
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);

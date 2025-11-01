@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "render/shader.hpp"
-#include "render/model.hpp"
+#include "render/drawable.hpp"
 #include "render/renderer.hpp"
 #include "game/scene.hpp"
 #include "game/resource_manager.hpp"
@@ -39,46 +39,18 @@ static Scene scene{
 
 		.locked = true
 	},
-	.dirLight{
-		.enable = true,
-		.direction = {-0.5f, -1.0f, -0.5f},
-		.ambient = glm::vec3(0.3f),
-		.diffuse = glm::vec3(0.8f),
-		.specular = glm::vec3(0.5f)
-	},
-	.pointLight{
-		.enable = false,
-		.position = {0.f, 35.f, 0.f},
-
-		.constant = 1.f,
-		// .linear = 0.09f,
-		// .quadratic = 0.032f,
-		.linear = 0,
-		.quadratic = 0.004f,
-
-		.ambient = {0.8f, 0.8f, 1.f},
-		.diffuse = {0.6f, 0.6f, 1.f},
-		.specular = {1.f, 1.f, 1.f},
-	},
-	.spotLight{
-		.enable = false,
-		.position = {3, 45, 30},
-		.direction = {0, -0.5, -0.5},
-
-		.cutOff = glm::cos(glm::radians(12.5f)), // cos
-		.outerCutOff = glm::cos(glm::radians(17.5f)), // cos
-
-		.constant = 1.f,
-		.linear = 0.09f,
-		.quadratic = 0.001f,
-
-		.ambient = glm::vec3(0.f),
+	.light{
+		.position = glm::vec3(0.f),
+		.ambient = glm::vec3(0.1f),
 		.diffuse = glm::vec3(1.f),
-		.specular = glm::vec3(1.f),
+
+		.constant = 1.0f,
+		.linear = 0.16f,
+		.quadratic = 0.009f,
 	}
 };
 static Render::PostEffects effects{
-	.quantization = true,
+	.quantization = false,
 	.quantizationLevel = 128,
 
 	.vignette = true,
@@ -87,31 +59,21 @@ static Render::PostEffects effects{
 };
 static Config config{
 	.windowRes = {1280, 720},
-	.renderRes = {800, 600}, // 320, 240
-	.shadowRes = 1024,
+	.renderRes = {1280, 720}, // 320, 240
 
 	// --- GRAPHICS ---
 	.renderDistance = 500.f,
-	.vsync = true,
+	.vsync = false,
 	.fillColor = {0.3, 0.3, 0.3}
 };
 
-static bool FLASHLIGHT = false;
-
 static GLFWwindow* window = nullptr;
 static Render::Renderer* renderer = nullptr;
-
-static std::array<float, 256> FPS = {0};
 static bool DEBUG_INFO = false;
 
 void DrawDebugInfo() {
 	ImGui::Begin("Debug Info", 0, ImGuiWindowFlags_NoTitleBar);
 
-	const float largest_num = *(std::ranges::max_element(FPS));
-	const float avg_num = std::accumulate(FPS.begin(), FPS.end(), 0.0) / FPS.size();
-
-	ImGui::PlotLines(" ", FPS.data(), FPS.size(), 0, ("avg: " + std::to_string(avg_num)).c_str(), 0, largest_num + 200,
-	                 {300, 70});
 
 	ImGui::End(); // End general options
 }
@@ -135,9 +97,6 @@ void DrawOptions() {
 			renderer->updateRenderRes();
 		}
 		ImGui::ColorPicker3("Fill color", &config.fillColor[0]);
-		// if (ImGui::InputInt("Shadow Resolution", &config.shadowRes)) {
-		// renderer->updateShadowRes();
-		// }
 	}
 
 	if (ImGui::CollapsingHeader("Camera Settings")) {
@@ -149,64 +108,12 @@ void DrawOptions() {
 	}
 
 	if (ImGui::CollapsingHeader("Light Settings")) {
-		if (ImGui::TreeNode("Directional Light")) {
-			ImGui::SliderInt("Enable", &scene.dirLight.enable, 0, 1);
-
-			ImGui::BeginDisabled(!scene.dirLight.enable);
-
-			//ImGui::ColorEdit3("Color", &scene.dirLight.color[0]);
-			ImGui::InputFloat3("Direction", &scene.dirLight.direction[0]);
-			ImGui::InputFloat3("Ambient", &scene.dirLight.ambient[0]);
-			ImGui::InputFloat3("Diffuse", &scene.dirLight.diffuse[0]);
-			ImGui::InputFloat3("Specular", &scene.dirLight.specular[0]);
-
-			ImGui::EndDisabled();
-			ImGui::TreePop();
-		}
-		if (ImGui::TreeNode("Point Light")) {
-			ImGui::SliderInt("Enable", &scene.pointLight.enable, 0, 1);
-
-			ImGui::BeginDisabled(!scene.pointLight.enable);
-
-			//ImGui::ColorEdit3("Color", &scene.pointLight.color[0]);
-
-			ImGui::InputFloat3("Position", &scene.pointLight.position[0]);
-			ImGui::InputFloat3("Ambient", &scene.pointLight.ambient[0]);
-			ImGui::InputFloat3("Diffuse", &scene.pointLight.diffuse[0]);
-			ImGui::InputFloat3("Specular", &scene.pointLight.specular[0]);
-
-			ImGui::InputFloat("Constant", &scene.pointLight.constant);
-			ImGui::InputFloat("Linear", &scene.pointLight.linear);
-			ImGui::InputFloat("Quadratic", &scene.pointLight.quadratic);
-
-			ImGui::EndDisabled();
-			ImGui::TreePop();
-		}
-		if (ImGui::TreeNode("Spot Light")) {
-			ImGui::SliderInt("Enable", &scene.spotLight.enable, 0, 1);
-
-			ImGui::BeginDisabled(!scene.spotLight.enable);
-
-			//ImGui::ColorEdit3("Color", &scene.spotLight.color[0]);
-
-			ImGui::InputFloat3("Position", &scene.spotLight.position[0]);
-			ImGui::InputFloat3("Direction", &scene.spotLight.direction[0]);
-
-			ImGui::InputFloat3("Ambient", &scene.spotLight.ambient[0]);
-			ImGui::InputFloat3("Diffuse", &scene.spotLight.diffuse[0]);
-			ImGui::InputFloat3("Specular", &scene.spotLight.specular[0]);
-
-			ImGui::InputFloat("Constant", &scene.spotLight.constant);
-			ImGui::InputFloat("Linear", &scene.spotLight.linear);
-			ImGui::InputFloat("Quadratic", &scene.spotLight.quadratic);
-
-			ImGui::SliderAngle("CutOff", &scene.spotLight.cutOff, 0, 180);
-			ImGui::SliderAngle("OuterCutOff", &scene.spotLight.outerCutOff, 0,
-			                   glm::degrees(scene.spotLight.cutOff) - 1);
-
-			ImGui::EndDisabled();
-			ImGui::TreePop();
-		}
+		ImGui::InputFloat3("Position", &scene.light.position[0]);
+		ImGui::InputFloat3("Ambient", &scene.light.ambient[0]);
+		ImGui::InputFloat3("Diffuse", &scene.light.diffuse[0]);
+		ImGui::InputFloat("Constant", &scene.light.constant);
+		ImGui::InputFloat("Linear", &scene.light.linear);
+		ImGui::InputFloat("Quadratic", &scene.light.quadratic);
 	}
 
 	if (ImGui::CollapsingHeader("Objects Settings")) {
@@ -309,8 +216,6 @@ void InitIMGUI() {
 	ImGui::StyleColorsDark();
 	SetStyleIMGUI();
 
-	// io.Fonts->AddFontFromFileTTF("assets/fonts/NotoSans-Medium.ttf", 18.f);
-
 	// Setup Platform/Renderer bindings
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init("#version 330");
@@ -360,18 +265,10 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, GL_TRUE);
-	} else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-		scene.camera = Camera();
 	} else if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
 		SaveScreenshot("frame.png");
 	} else if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
 		DEBUG_INFO = !DEBUG_INFO;
-	} else if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-		std::cout << OUT_DEBUG << "Flashlight: " << (FLASHLIGHT ? "on" : "off") << std::endl;
-		FLASHLIGHT = !FLASHLIGHT;
-		scene.spotLight.enable = FLASHLIGHT;
-	} else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-		scene.pointLight.enable = !scene.pointLight.enable;
 	}
 }
 
@@ -455,7 +352,7 @@ void InitGLFW() {
 	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 	//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	window = glfwCreateWindow(config.windowRes.x, config.windowRes.y, "chess3d", nullptr, nullptr);
+	window = glfwCreateWindow(config.windowRes.x, config.windowRes.y, "chess3d DEV", nullptr, nullptr);
 
 	glfwSetKeyCallback(window, KeyCallback);
 	glfwSetCursorPosCallback(window, MousePosCallback);
@@ -478,167 +375,24 @@ void InitGLFW() {
 	}
 }
 
-Render::MeshPtr CreateSphereMesh(float radius, uint32_t stackCount, uint32_t sliceCount) {
-	Render::MeshPtr mesh = std::make_shared<Render::Mesh>();
-	mesh->name = "sphere";
-
-	// Генерация вершин
-	mesh->vertices.push_back({
-		glm::vec3(0.0f, radius, 0.0f), // position
-		glm::vec3(0.0f, 1.0f, 0.0f), // normal
-		glm::vec2(0.5f, 0.0f) // tex_coords
-	});
-
-	const float pi = glm::pi<float>();
-	for (uint32_t stack = 1; stack < stackCount; ++stack) {
-		float theta = stack * pi / stackCount;
-		float sinTheta = sin(theta);
-		float cosTheta = cos(theta);
-
-		for (uint32_t slice = 0; slice <= sliceCount; ++slice) {
-			float phi = slice * 2.0f * pi / sliceCount;
-			float sinPhi = sin(phi);
-			float cosPhi = cos(phi);
-
-			Render::Vertex v;
-			v.pos = glm::vec3(
-				radius * sinTheta * cosPhi,
-				radius * cosTheta,
-				radius * sinTheta * sinPhi
-			);
-			v.normal = glm::normalize(v.pos);
-			v.texCoords = glm::vec2(
-				static_cast<float>(slice) / sliceCount,
-				static_cast<float>(stack) / stackCount
-			);
-
-			mesh->vertices.push_back(v);
-		}
-	}
-
-	mesh->vertices.push_back({
-		glm::vec3(0.0f, -radius, 0.0f), // position
-		glm::vec3(0.0f, -1.0f, 0.0f), // normal
-		glm::vec2(0.5f, 1.0f) // tex_coords
-	});
-
-	// Генерация индексов (counter-clockwise порядок)
-	const uint32_t poleStart = 0;
-	const uint32_t ringVertexCount = sliceCount + 1;
-
-	// Верхний полюс
-	for (uint32_t slice = 0; slice < sliceCount; ++slice) {
-		mesh->indices.push_back(poleStart);
-		mesh->indices.push_back(1 + (slice + 1) % sliceCount);
-		mesh->indices.push_back(1 + slice);
-	}
-
-	// Основные кольца
-	for (uint32_t stack = 0; stack < stackCount - 2; ++stack) {
-		uint32_t ringStart = 1 + stack * ringVertexCount;
-		uint32_t nextRingStart = ringStart + ringVertexCount;
-
-		for (uint32_t slice = 0; slice < sliceCount; ++slice) {
-			// Первый треугольник квада (counter-clockwise)
-			mesh->indices.push_back(ringStart + slice);
-			mesh->indices.push_back(ringStart + slice + 1);
-			mesh->indices.push_back(nextRingStart + slice);
-
-			// Второй треугольник квада (counter-clockwise)
-			mesh->indices.push_back(nextRingStart + slice);
-			mesh->indices.push_back(ringStart + slice + 1);
-			mesh->indices.push_back(nextRingStart + slice + 1);
-		}
-	}
-
-	// Нижний полюс
-	const uint32_t bottomPoleIndex = static_cast<uint32_t>(mesh->vertices.size() - 1);
-	const uint32_t lastRingStart = 1 + (stackCount - 2) * ringVertexCount;
-
-	for (uint32_t slice = 0; slice < sliceCount; ++slice) {
-		mesh->indices.push_back(bottomPoleIndex);
-		mesh->indices.push_back(lastRingStart + slice);
-		mesh->indices.push_back(lastRingStart + slice + 1);
-	}
-
-	mesh->setup();
-
-	return mesh;
-}
-
-Render::MeshPtr CreatePlaneMesh(float shininess, const std::string& name) {
-	Render::MeshPtr mesh = std::make_shared<Render::Mesh>();;
-	Render::MaterialPtr mat = std::make_shared<Render::Material>();
-
-	// setup material
-
-	mat->name = name;
-	mat->diffuse[0] = ResourceManager::CreateDefaultTexture({200, 200, 200}, {200, 200, 200}); // TODO solid color
-	mat->shininess = shininess;
-
-	// setup mesh
-
-	mesh->name = name;
-
-	mesh->vertices = {
-		{{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
-	};
-
-	mesh->indices = {0, 2, 1, 0, 3, 2};
-	mesh->material = mat;
-
-	mesh->setup();
-
-	return mesh;
-}
-
-void setupScene(bool props) {
+void setupScene() {
 	// setup chess set
 
 	Render::ShaderPtr shader = std::make_shared<Render::Shader>("assets/shaders/scene.vert",
 	                                                            "assets/shaders/scene.frag");
 
-	if (props) {
-		// Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
-		Render::MeshPtr lightBulb = CreateSphereMesh(0.1, 32, 32);
-		lightBulb->castShadow = false;
-		lightBulb->name = "LightBulb";
-		lightBulb->material = std::make_shared<Render::Material>();
-		lightBulb->material->shader = std::make_shared<Render::Shader>("assets/shaders/light.vert",
-		                                                               "assets/shaders/light.frag");
-		lightBulb->material->shininess = 255;
-		scene.objects.push_back(lightBulb);
+	Render::ModelPtr toy = ResourceManager::LoadModel("assets/models/slayer_toy.obj", shader);
+	toy->transform = {
+		.position = {-5, 16, 0},
+		.rotation = {-90, 0, -45},
+		.scale = glm::vec3(0.3f)
+	};
+	scene.objects.push_back(toy);
 
-		Render::ModelPtr toy = ResourceManager::LoadModel("assets/models/slayer_toy.obj", shader);
-		toy->transform = {
-			.scale = glm::vec3(0.3f),
-			.rotation = {-90, 0, -45},
-			.position = {-5, 16, 0}
-		};
-		scene.objects.push_back(toy);
-
-		// Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/untitled.obj", shader);
-		// chess->transform = {
-		// .position = {-7, 16.28, 0},
-		// .scale = glm::vec3(0.3)
-		// };
-		// scene.objects.push_back(chess);
-
-		Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader);
-		desk->transform.scale = {20, 20, 20};
-		scene.objects.push_back(desk);
-	}
-
-	// create floor
-
-	Render::MeshPtr floor = CreatePlaneMesh(8, "floor_plane");
-	floor->transform.scale = glm::vec3(config.renderDistance);
-	floor->material->shader = shader;
-	floor->castShadow = false;
-	scene.objects.push_back(floor);
+	Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader);
+	desk->transform.scale = {20, 20, 20};
+	desk->castShadow = false;
+	scene.objects.push_back(desk);
 }
 
 int main(int argc, char** argv) {
@@ -646,33 +400,13 @@ int main(int argc, char** argv) {
 	InitIMGUI();
 
 	// TODO make loading screen w/ progresbar
-	setupScene(true);
+	setupScene();
 
 	renderer = new Render::Renderer(config);
 
-	double lastTime = glfwGetTime();
-	int frameCount = 0;
-	uint8_t indexFPS = 0;
-
 	while (!glfwWindowShouldClose(window)) {
-		renderer->genShadowMaps(scene);
-
-		if (DEBUG_INFO) {
-			frameCount++;
-			FPS[indexFPS] = frameCount / (glfwGetTime() - lastTime);
-			indexFPS++;
-			frameCount = 0;
-			lastTime = glfwGetTime();
-		}
-
-		if (FLASHLIGHT) {
-			scene.spotLight.position = scene.camera.position;
-			scene.spotLight.position.y -= 2;
-			scene.spotLight.position.x -= 2;
-			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
-		}
-
 		scene.camera.updatePosition();
+
 		renderer->drawScene(scene);
 		renderer->renderFrame(effects);
 

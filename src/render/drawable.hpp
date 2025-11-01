@@ -13,7 +13,6 @@ namespace Render {
 		glm::vec3 pos;
 		glm::vec3 normal;
 		glm::vec2 texCoords;
-		glm::vec3 tangent;
 	};
 
 	struct Transform {
@@ -37,16 +36,9 @@ namespace Render {
 	struct Material {
 		std::string name;
 
-		uint32_t diffuse[3];
-		uint32_t specular[3];
-		uint32_t normal[3];
-
-		float shininess{0};
+		uint32_t baseColor;
 		ShaderPtr shader;
-		glm::vec3 solidColor;
-		bool useSolidColor{false};
-		//GLuint ior;       // index of refraction
-		//GLuint dissolve;  // 1 == opaque; 0 == fully transparent
+
 		void apply() const;
 	};
 
@@ -98,6 +90,24 @@ namespace Render {
 
 		~Model() override;
 	};
-
 	using ModelPtr = std::shared_ptr<Model>;
+
+	class Sprite : public DrawableObject {
+	public:
+		Sprite(uint32_t texture);
+
+		ShaderPtr shader;
+
+		void draw(const Transform& model = {}) override;
+		void draw(const ShaderPtr& shader, const Transform& model) override;
+
+		~Sprite() override = default;
+
+	private:
+		uint32_t texture;
+		uint32_t VAO, VBO, EBO;
+	};
+
+	using SpritePtr = std::shared_ptr<Sprite>;
+
 }

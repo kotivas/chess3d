@@ -9,7 +9,6 @@
 
 #include "../game/config.hpp"
 #include "../game/scene.hpp"
-#include "shadow.hpp"
 
 namespace Render {
 	struct PostEffects {
@@ -25,8 +24,7 @@ namespace Render {
 	public:
 		Renderer(Config& config);
 
-		// render shadow map from light position
-		void genShadowMaps(Scene& scene);
+		void drawShadows(Scene& scene);
 
 		// draw scene to the FBO
 		void drawScene(Scene& scene);
@@ -48,21 +46,18 @@ namespace Render {
 		void createQuadVAO();
 		void createUBO();
 
-		void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& dirLightSpaceMatrix,
-		                       const glm::mat4& spotLightSpaceMatrix);
-		void updateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
+		void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view);
+		void updateUBOLight(Light& light);
 		void UpdateUBOData(const glm::vec3& viewPos);
 
 		Shader postfxShader;
 
+		SpritePtr shadow;
+
 		Config& config;
 
 		uint32_t FBO, RBO;
-		uint32_t UBOMatrices, UBOLights, UBOData;
-
-		DirShadowData dirShadow;
-		SpotShadowData spotShadow;
-		OmniShadowData pointShadow;
+		uint32_t UBOMatrices, UBOLight, UBOData;
 
 		uint32_t quadVAO, quadVBO;
 		uint32_t textureColorBuffer;

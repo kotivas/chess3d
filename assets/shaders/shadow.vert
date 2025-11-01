@@ -6,11 +6,15 @@ layout (location = 2) in vec2 aTexCoords;
 layout(std140, binding = 0) uniform Matrices {
     mat4 u_Projection;
     mat4 u_View;
-    mat4 u_LightSpaceMatrix;
 };
-
 uniform mat4 u_Model;
 
+out VS_OUT {
+    vec2 TexCoords;
+} vs_out;
+
 void main() {
+    vs_out.TexCoords = aTexCoords;
+
     gl_Position = u_Projection * u_View * u_Model * vec4(aPos, 1.0);
 }

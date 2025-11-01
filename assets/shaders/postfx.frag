@@ -34,5 +34,7 @@ void main() {
     if (effects.quantization) color = quantizeColor(color, effects.quantizationLevel);
     if (effects.vignette) color = applyVignette(color);
 
+
+
     FragColor = vec4(color, 1.0);
 }

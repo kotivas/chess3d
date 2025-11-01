@@ -3,7 +3,7 @@ project(chess3d C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
-find_package(Opengl REQUIRED)
+find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glad REQUIRED)
 find_package(glm REQUIRED)
@@ -21,12 +21,10 @@ set(SOURCE
 	"src/game/camera.cpp"
 	"src/render/shader.cpp"
 	"src/render/renderer.cpp"
-	"src/render/model.cpp"
-	"src/game/game.cpp"
+	"src/render/drawable.cpp"
  	"src/game/resource_manager.cpp"
 		"src/util.cpp"
-		src/render/shadow.cpp
-		src/render/shadow.hpp)
+)
 
 add_executable(chess3d ${SOURCE} )
 add_custom_command(

@@ -1,4 +1,4 @@
-#include "model.hpp"
+#include "drawable.hpp"
 
 #include "../util.hpp"
 
@@ -31,10 +31,6 @@ namespace Render {
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoords));
 
-		// Настройка атрибута тангента
-		glEnableVertexAttribArray(3);
-		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
-
 		glBindVertexArray(0);
 	}
 
@@ -42,33 +38,18 @@ namespace Render {
 		assert(shader);
 
 		// bind diffuse map
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(GL_TEXTURE_2D, diffuse[0]);
-		glActiveTexture(GL_TEXTURE4);
-		glBindTexture(GL_TEXTURE_2D, specular[0]);
-		glActiveTexture(GL_TEXTURE5);
-		glBindTexture(GL_TEXTURE_2D, normal[0]);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, baseColor);
 
 		shader->use();
 
-		shader->setUniform1f("material.shininess", shininess); // to _materials
-		shader->setUniform3f("material.solidColor", solidColor);
-		shader->setUniform1i("material.useSolidColor", useSolidColor);
-		shader->setUniform1i("shadowMap", 0);
-
-		shader->setUniform1i("dirShadowMap", 0);
-		shader->setUniform1i("spotShadowMap", 1);
-		shader->setUniform1i("omniShadowMap", 2);
-		shader->setUniform1i("material.diffuse", 3);
-		shader->setUniform1i("material.specular", 4);
-		shader->setUniform1i("material.normal", 5);
+		shader->setUniform1i("baseColor", 0);
 	}
 
 	void Mesh::draw(const Transform& model) {
 		assert(material);
 
 		material->apply();
-
 
 		glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
 		material->shader->setUniformMat4fv("u_Model", GL_FALSE, modelMat);
@@ -130,5 +111,78 @@ namespace Render {
 	Model::~Model() {
 		std::cout << OUT_WARNING << "Model " << name << " destructed" << std::endl;
 		meshes.clear();
+	}
+
+	Sprite::Sprite(uint32_t texture)
+		: texture(texture), shader(nullptr) {
+		name = "ShadowBlob";
+
+		std::vector<Vertex> vertices = {
+		{{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+		{{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+		{{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+		{{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+	};
+
+		std::vector indices = {0, 2, 1, 0, 3, 2};
+
+		// Генерация и настройка VAO, VBO и EBO
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+		glGenBuffers(1, &EBO);
+
+		glBindVertexArray(VAO);
+
+		// Загрузка данных вершин в VBO
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+
+		// Загрузка данных индексов в EBO
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+
+		// Настройка атрибута позиции
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, pos));
+
+		// Настройка атрибута нормали
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+
+		// Настройка атрибута текстурных координат
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoords));
+
+		glBindVertexArray(0);
+	}
+
+	void Sprite::draw(const Transform& model) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture);
+
+		shader->use();
+		shader->setUniform1i("baseColor", 0);
+
+		glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
+		shader->setUniformMat4fv("u_Model", GL_FALSE, modelMat);
+
+		glBindVertexArray(VAO);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
+	}
+
+	void Sprite::draw(const ShaderPtr& shader, const Transform& model) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture);
+
+		shader->use();
+		shader->setUniform1i("baseColor", 0);
+
+		glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
+		shader->setUniformMat4fv("u_Model", GL_FALSE, modelMat);
+
+		glBindVertexArray(VAO);
+		glDrawElements(GL_TRIANGLES, 5, GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
 	}
 }

@@ -1,5 +1,5 @@
 #pragma once
-#include "../render/model.hpp"
+#include "../render/drawable.hpp"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>

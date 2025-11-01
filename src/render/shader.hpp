@@ -8,7 +8,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "../game/camera.hpp"
-#include "../game/light.hpp"
 
 #include <memory>
 
