@@ -20,51 +20,49 @@ namespace Render {
 		float vignetteIntensity;
 		glm::vec3 vignetteColor;
 	};
+}
 
-	class Renderer {
-	public:
-		Renderer(Config& config);
+	namespace Renderer {
+		void Init();
+		void InitGLFW();
 
 		// render shadow map from light position
-		void genShadowMaps(Scene& scene);
+		void GenShadowMaps(Scene& scene);
 
 		// draw scene to the FBO
-		void drawScene(Scene& scene);
+		void DrawScene(Scene& scene);
 
 		// applying post fx and rendering to the screen FBO
-		void renderFrame(PostEffects effects);
+		void RenderFrame(Render::PostEffects effects);
 
-		void updateShadowRes();
-		void updateRenderRes();
+		// void UpdateShadowRes();
+		void UpdateRenderRes();
 
-		~Renderer();
+		void RenderClear();
 
-	private:
-		//GLFWwindow* window;
+		void CreateFrameBuffer();
+		void CreateQuadVAO();
+		void CreateUBO();
 
-		void renderClear();
-
-		void createFrameBuffer();
-		void createQuadVAO();
-		void createUBO();
-
-		void updateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& dirLightSpaceMatrix,
+		void UpdateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& dirLightSpaceMatrix,
 		                       const glm::mat4& spotLightSpaceMatrix);
-		void updateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
+		void UpdateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
 		void UpdateUBOData(const glm::vec3& viewPos);
 
-		Shader postfxShader;
+		void Shutdown();
 
-		Config& config;
+		static Render::Shader postfxShader;
 
-		uint32_t FBO, RBO;
-		uint32_t UBOMatrices, UBOLights, UBOData;
+		static uint32_t FBO, RBO;
+		static uint32_t UBOMatrices, UBOLights, UBOData;
 
-		DirShadowData dirShadow;
-		SpotShadowData spotShadow;
-		OmniShadowData pointShadow;
+		static Render::DirShadowData dirShadow;
+		static Render::SpotShadowData spotShadow;
+		static Render::OmniShadowData pointShadow;
 
-		uint32_t quadVAO, quadVBO;
-		uint32_t textureColorBuffer;
+		static uint32_t quadVAO, quadVBO;
+		static uint32_t textureColorBuffer;
+
+		inline GLFWwindow* g_window = nullptr;
 	};
-}
+

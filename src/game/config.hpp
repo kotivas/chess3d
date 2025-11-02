@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 struct Config {
 	// --- RESOLUTIONS ---
@@ -12,3 +13,5 @@ struct Config {
 	bool vsync;
 	glm::vec3 fillColor;
 };
+
+extern Config g_config;

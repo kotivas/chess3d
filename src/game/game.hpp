@@ -1,12 +1,10 @@
 #pragma once
 
-class Game {
-public:
 
-	bool isRunning() const { return _running; };
-	void update(double dt);
+namespace Game {
 
-private:
+	void Init();
+	void Update(float deltaTime);
+	void Shutdown();
 
-	bool _running;
-};
+}

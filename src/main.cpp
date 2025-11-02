@@ -1,14 +1,14 @@
 // it is what it is
-#include <iostream>
-#include <array>
 #include <algorithm>
+#include <array>
+#include <iostream>
 
-#include "render/shader.hpp"
+#include "game/config.hpp"
+#include "game/resource_manager.hpp"
+#include "game/scene.hpp"
 #include "render/model.hpp"
 #include "render/renderer.hpp"
-#include "game/scene.hpp"
-#include "game/resource_manager.hpp"
-#include "game/config.hpp"
+#include "render/shader.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -16,6 +16,8 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <numeric>
+
+#include "./input/input.hpp"
 
 #include "stb_image_write.h"
 #include "util.hpp"
@@ -40,7 +42,7 @@ static Scene scene{
 		.locked = true
 	},
 	.dirLight{
-		.enable = false,
+		.enable = true,
 		.direction = {-0.5f, -1.0f, -0.5f},
 		.ambient = glm::vec3(0.3f),
 		.diffuse = glm::vec3(0.8f),
@@ -85,21 +87,8 @@ static Render::PostEffects effects{
 	.vignetteIntensity = 0.25f,
 	.vignetteColor = glm::vec3(0)
 };
-static Config config{
-	.windowRes = {1280, 720},
-	.renderRes = {1920, 1080}, // 320, 240
-	.shadowRes = 2048,
-
-	// --- GRAPHICS ---
-	.renderDistance = 1000.f,
-	.vsync = true,
-	.fillColor = {0.3, 0.3, 0.3}
-};
 
 static bool FLASHLIGHT = false;
-
-static GLFWwindow* window = nullptr;
-static Render::Renderer* renderer = nullptr;
 
 static std::array<float, 256> FPS = {0};
 static bool DEBUG_INFO = false;
@@ -114,6 +103,36 @@ void DrawDebugInfo() {
 	                 {300, 70});
 
 	ImGui::End(); // End general options
+}
+
+void DrawKeymap() {
+	ImGui::Begin("Input");
+
+	const int cols = 30; // how many bits per row
+	const float size = 10.0f; // button size in pixels
+
+	for (size_t i = 32; i < 350; ++i) {
+		ImGui::PushID(static_cast<int>(i));
+
+		bool state = Input::keydownmap[i];
+		ImVec4 color = state ? ImVec4(0.3f, 0.8f, 0.3f, 1.0f) : ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
+		ImGui::PushStyleColor(ImGuiCol_Button, color);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
+
+		ImGui::Button(" ", ImVec2(size, size));
+
+		ImGui::PopStyleColor(3);
+		ImGui::PopID();
+
+		if ((i + 1) % cols != 0)
+			ImGui::SameLine();
+	}
+
+	ImGui::Separator();
+	ImGui::Text("Offset scroll y %f", Input::g_scrollYOffset);
+
+	ImGui::End();
 }
 
 void DrawOptions() {
@@ -131,10 +150,10 @@ void DrawOptions() {
 
 	if (ImGui::CollapsingHeader("Render Settings")) {
 		//ImGui::ColorEdit3("Void Color", &voidColor[0]);
-		if (ImGui::InputInt2("Render Resolution", &config.renderRes[0])) {
-			renderer->updateRenderRes();
+		if (ImGui::InputInt2("Render Resolution", &g_config.renderRes[0])) {
+			Renderer::UpdateRenderRes();
 		}
-		ImGui::ColorPicker3("Fill color", &config.fillColor[0]);
+		ImGui::ColorPicker3("Fill color", &g_config.fillColor[0]);
 		// if (ImGui::InputInt("Shadow Resolution", &config.shadowRes)) {
 		// renderer->updateShadowRes();
 		// }
@@ -308,80 +327,70 @@ void InitIMGUI() {
 	ImGui::StyleColorsDark();
 	SetStyleIMGUI();
 
-	// io.Fonts->AddFontFromFileTTF("assets/fonts/NotoSans-Medium.ttf", 18.f);
-
 	// Setup Platform/Renderer bindings
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplGlfw_InitForOpenGL(Renderer::g_window, true);
 	ImGui_ImplOpenGL3_Init("#version 330");
 }
 
 void SaveScreenshot(const char* filename) {
 	// Выделение памяти под пиксели (формат RGB)
-	std::vector<unsigned char> pixels(config.windowRes.x * config.windowRes.y * 3);
+	std::vector<unsigned char> pixels(g_config.windowRes.x * g_config.windowRes.y * 3);
 
 	// Настройка параметров чтения пикселей
 	glPixelStorei(GL_PACK_ALIGNMENT, 1); // Убираем выравнивание
 	glReadBuffer(GL_FRONT); // Читаем из переднего буфера (для двойной буферизации)
 
 	// Чтение пикселей из буфера
-	glReadPixels(0, 0, config.windowRes.x, config.windowRes.y, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+	glReadPixels(0, 0, g_config.windowRes.x, g_config.windowRes.y, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
 
 	// Переворот изображения по вертикали (OpenGL хранит пиксели снизу вверх)
 	std::vector<unsigned char> flippedPixels(pixels.size());
-	for (int y = 0; y < config.windowRes.y; ++y) {
-		for (int x = 0; x < config.windowRes.x; ++x) {
+	for (int y = 0; y < g_config.windowRes.y; ++y) {
+		for (int x = 0; x < g_config.windowRes.x; ++x) {
 			for (int c = 0; c < 3; ++c) {
-				flippedPixels[(config.windowRes.y - 1 - y) * config.windowRes.x * 3 + x * 3 + c] =
-					pixels[y * config.windowRes.x * 3 + x * 3 + c];
+				flippedPixels[(g_config.windowRes.y - 1 - y) * g_config.windowRes.x * 3 + x * 3 + c] =
+					pixels[y * g_config.windowRes.x * 3 + x * 3 + c];
 			}
 		}
 	}
 
 	// Сохранение в PNG
-	stbi_write_png(filename, config.windowRes.x, config.windowRes.y, 3, flippedPixels.data(), config.windowRes.x * 3);
+	stbi_write_png(filename, g_config.windowRes.x, g_config.windowRes.y, 3, flippedPixels.data(),
+	               g_config.windowRes.x * 3);
 	std::cout << OUT_INFO << "Screenshot saved as " << filename << std::endl;
 }
 
-void MousePosCallback(GLFWwindow* window, double xpos, double ypos) {
-	scene.camera.mouseMoved(xpos, ypos);
-}
-
-void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-	if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
-		scene.camera.locked = false;
-		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	} else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
-		scene.camera.locked = true;
-		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-	}
-}
-
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-		glfwSetWindowShouldClose(window, GL_TRUE);
-	} else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-		scene.camera = Camera();
-	} else if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+void updateControls() {
+	if (Input::IsKeyPressed(GLFW_KEY_ESCAPE)) {
+		glfwSetWindowShouldClose(Renderer::g_window, GL_TRUE);
+	} else if (Input::IsKeyPressed(GLFW_KEY_F11)) {
 		SaveScreenshot("frame.png");
-	} else if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+	} else if (Input::IsKeyPressed(GLFW_KEY_F12)) {
 		DEBUG_INFO = !DEBUG_INFO;
-	} else if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+	} else if (Input::IsKeyPressed(GLFW_KEY_F)) {
 		std::cout << OUT_DEBUG << "Flashlight: " << (FLASHLIGHT ? "on" : "off") << std::endl;
 		FLASHLIGHT = !FLASHLIGHT;
 		scene.spotLight.enable = FLASHLIGHT;
-	} else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+	} else if (Input::IsKeyPressed(GLFW_KEY_P)) {
 		scene.pointLight.enable = !scene.pointLight.enable;
 	}
-}
 
-void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-	scene.camera.mouseScrolled(yoffset, config.renderDistance);
-}
+	if (Input::IsRightMouseDown()) {
+		scene.camera.locked = false;
+	} else {
+		scene.camera.locked = true;
+	}
 
-void ResizeCallback(GLFWwindow* window, int width, int height) {
-	if (width == 0 && height == 0) return; // in case of minimizing
-	config.windowRes = {width, height};
-	glViewport(0, 0, width, height);
+	if ( Input::g_resizedHeight || Input::g_resizedWidth ) {
+		if (Input::g_resizedWidth == 0 && Input::g_resizedHeight == 0) return; // in case of minimizing
+		g_config.windowRes = {Input::g_resizedWidth, Input::g_resizedHeight};
+		g_config.renderRes = {Input::g_resizedWidth, Input::g_resizedHeight};
+		Renderer::UpdateRenderRes();
+		glViewport(0, 0, Input::g_resizedWidth, Input::g_resizedHeight);
+	}
+
+	scene.camera.mouseMoved(Input::GetMouseX(), Input::GetMouseY());
+	scene.camera.mouseScrolled(Input::GetScrollYOffset(), g_config.renderDistance);
 }
 
 void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length,
@@ -393,14 +402,15 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum 
 	std::cout << OUT_DEBUG << "(";
 
 	switch (severity) {
-	case GL_DEBUG_SEVERITY_HIGH: std::cout << "\033[31mhigh\033[0m";
+	case GL_DEBUG_SEVERITY_HIGH: std::cout << "high";
 		break;
-	case GL_DEBUG_SEVERITY_MEDIUM: std::cout << "\033[33mmedium\033[0m";
+	case GL_DEBUG_SEVERITY_MEDIUM: std::cout << "medium";
 		break;
-	case GL_DEBUG_SEVERITY_LOW: std::cout << "\033[32mlow\033[0m";
+	case GL_DEBUG_SEVERITY_LOW: std::cout << "low";
 		break;
-	case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "\033[34mnotification\033[0m";
+	case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "info";
 		break;
+	default: std::cout << "unknown";
 	}
 	std::cout << "; ";
 
@@ -417,6 +427,7 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum 
 		break;
 	case GL_DEBUG_SOURCE_OTHER: std::cout << "Other";
 		break;
+	default: std::cout << "unknown";
 	}
 	std::cout << "; ";
 
@@ -439,183 +450,34 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum 
 		break;
 	case GL_DEBUG_TYPE_OTHER: std::cout << "Other";
 		break;
+	default: std::cout << "unknown";
 	}
 
 	std::cout << "): " << message << " (" << id << ")" << std::endl;
 }
 
-void InitGLFW() {
-	// Init GLFW
-	glfwInit();
-	// Set all the required options for GLFW
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-	//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-
-	window = glfwCreateWindow(config.windowRes.x, config.windowRes.y, "chess3d", nullptr, nullptr);
-
-	glfwSetKeyCallback(window, KeyCallback);
-	glfwSetCursorPosCallback(window, MousePosCallback);
-	glfwSetMouseButtonCallback(window, MouseButtonCallback);
-	glfwSetScrollCallback(window, ScrollCallback);
-	glfwSetFramebufferSizeCallback(window, ResizeCallback);
-
-	glfwMakeContextCurrent(window);
-	glfwSwapInterval(config.vsync); // vsync 1 - on; 0 - off
-
-	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-
-	int flags;
-	glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
-	if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
-		glEnable(GL_DEBUG_OUTPUT);
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-		glDebugMessageCallback(glDebugOutput, nullptr);
-		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
-	}
-}
-
-Render::MeshPtr CreateSphereMesh(float radius, uint32_t stackCount, uint32_t sliceCount) {
-	Render::MeshPtr mesh = std::make_shared<Render::Mesh>();
-	mesh->name = "sphere";
-
-	// Генерация вершин
-	mesh->vertices.push_back({
-		glm::vec3(0.0f, radius, 0.0f), // position
-		glm::vec3(0.0f, 1.0f, 0.0f), // normal
-		glm::vec2(0.5f, 0.0f) // tex_coords
-	});
-
-	const float pi = glm::pi<float>();
-	for (uint32_t stack = 1; stack < stackCount; ++stack) {
-		float theta = stack * pi / stackCount;
-		float sinTheta = sin(theta);
-		float cosTheta = cos(theta);
-
-		for (uint32_t slice = 0; slice <= sliceCount; ++slice) {
-			float phi = slice * 2.0f * pi / sliceCount;
-			float sinPhi = sin(phi);
-			float cosPhi = cos(phi);
-
-			Render::Vertex v;
-			v.pos = glm::vec3(
-				radius * sinTheta * cosPhi,
-				radius * cosTheta,
-				radius * sinTheta * sinPhi
-			);
-			v.normal = glm::normalize(v.pos);
-			v.texCoords = glm::vec2(
-				static_cast<float>(slice) / sliceCount,
-				static_cast<float>(stack) / stackCount
-			);
-
-			mesh->vertices.push_back(v);
-		}
-	}
-
-	mesh->vertices.push_back({
-		glm::vec3(0.0f, -radius, 0.0f), // position
-		glm::vec3(0.0f, -1.0f, 0.0f), // normal
-		glm::vec2(0.5f, 1.0f) // tex_coords
-	});
-
-	// Генерация индексов (counter-clockwise порядок)
-	const uint32_t poleStart = 0;
-	const uint32_t ringVertexCount = sliceCount + 1;
-
-	// Верхний полюс
-	for (uint32_t slice = 0; slice < sliceCount; ++slice) {
-		mesh->indices.push_back(poleStart);
-		mesh->indices.push_back(1 + (slice + 1) % sliceCount);
-		mesh->indices.push_back(1 + slice);
-	}
-
-	// Основные кольца
-	for (uint32_t stack = 0; stack < stackCount - 2; ++stack) {
-		uint32_t ringStart = 1 + stack * ringVertexCount;
-		uint32_t nextRingStart = ringStart + ringVertexCount;
-
-		for (uint32_t slice = 0; slice < sliceCount; ++slice) {
-			// Первый треугольник квада (counter-clockwise)
-			mesh->indices.push_back(ringStart + slice);
-			mesh->indices.push_back(ringStart + slice + 1);
-			mesh->indices.push_back(nextRingStart + slice);
-
-			// Второй треугольник квада (counter-clockwise)
-			mesh->indices.push_back(nextRingStart + slice);
-			mesh->indices.push_back(ringStart + slice + 1);
-			mesh->indices.push_back(nextRingStart + slice + 1);
-		}
-	}
-
-	// Нижний полюс
-	const uint32_t bottomPoleIndex = static_cast<uint32_t>(mesh->vertices.size() - 1);
-	const uint32_t lastRingStart = 1 + (stackCount - 2) * ringVertexCount;
-
-	for (uint32_t slice = 0; slice < sliceCount; ++slice) {
-		mesh->indices.push_back(bottomPoleIndex);
-		mesh->indices.push_back(lastRingStart + slice);
-		mesh->indices.push_back(lastRingStart + slice + 1);
-	}
-
-	mesh->setup();
-
-	return mesh;
-}
-
-Render::MeshPtr CreatePlaneMesh(float shininess, const std::string& name) {
-	Render::MeshPtr mesh = std::make_shared<Render::Mesh>();;
-	Render::MaterialPtr mat = std::make_shared<Render::Material>();
-
-	// setup material
-
-	mat->name = name;
-	mat->diffuse[0] = ResourceManager::CreateDefaultTexture({200, 200, 200}, {200, 200, 200}); // TODO solid color
-	mat->shininess = shininess;
-
-	// setup mesh
-
-	mesh->name = name;
-
-	mesh->vertices = {
-		{{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
-	};
-
-	mesh->indices = {0, 2, 1, 0, 3, 2};
-	mesh->material = mat;
-
-	mesh->setup();
-
-	return mesh;
-}
-
 void setupScene(bool props) {
 	// setup chess set
 
-	Render::ShaderPtr shader = std::make_shared<Render::Shader>("assets/shaders/scene.vert",
-	                                                            "assets/shaders/scene.frag");
+	Render::ShaderPtr shader = std::make_shared<Render::Shader>("shaders/scene.vert",
+	                                                            "shaders/scene.frag");
 
 	if (props) {
 		// Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
-		Render::MeshPtr lightBulb = CreateSphereMesh(0.1, 32, 32);
+		Render::MeshPtr lightBulb = Util::CreateSphereMesh(0.1, 32, 32);
 		lightBulb->castShadow = false;
 		lightBulb->name = "LightBulb";
 		lightBulb->material = std::make_shared<Render::Material>();
-		lightBulb->material->shader = std::make_shared<Render::Shader>("assets/shaders/light.vert",
-		                                                               "assets/shaders/light.frag");
+		lightBulb->material->shader = std::make_shared<Render::Shader>("shaders/light.vert",
+		                                                               "shaders/light.frag");
 		lightBulb->material->shininess = 255;
 		scene.objects.push_back(lightBulb);
 
 		Render::ModelPtr toy = ResourceManager::LoadModel("assets/models/slayer_toy.obj", shader);
 		toy->transform = {
-			.scale = glm::vec3(0.3f),
+			.position = {-5, 16, 0},
 			.rotation = {-90, 0, -45},
-			.position = {-5, 16, 0}
+			.scale = glm::vec3(0.3f)
 		};
 		scene.objects.push_back(toy);
 
@@ -633,28 +495,49 @@ void setupScene(bool props) {
 
 	// create floor
 
-	Render::MeshPtr floor = CreatePlaneMesh(8, "floor_plane");
-	floor->transform.scale = glm::vec3(config.renderDistance);
+	Render::MeshPtr floor = Util::CreatePlaneMesh(8, "floor_plane");
+	floor->transform.scale = glm::vec3(g_config.renderDistance);
 	floor->material->shader = shader;
 	floor->castShadow = false;
 	scene.objects.push_back(floor);
 }
 
+void setGlDebugOutput() {
+	int flags;
+	glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+	if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+		glEnable(GL_DEBUG_OUTPUT);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glDebugMessageCallback(glDebugOutput, nullptr);
+	}
+}
+
 int main(int argc, char** argv) {
-	InitGLFW();
+	g_config = {
+		.windowRes = {1280, 720},
+		.renderRes = {1280, 720}, // 320, 240
+		.shadowRes = 2048,
+		// --- GRAPHICS ---
+		.renderDistance = 1000.f,
+		.vsync = true,
+		.fillColor = {0.3, 0.3, 0.3}
+	};
+
+	Renderer::Init();
+	Input::Init();
 	InitIMGUI();
 
- 	// TODO make loading screen w/ progresbar
+
+	// TODO make loading screen w/ progresbar
 	setupScene(true);
 
-	renderer = new Render::Renderer(config);
 
 	double lastTime = glfwGetTime();
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
 
-	renderer->genShadowMaps(scene);
-	while (!glfwWindowShouldClose(window)) {
+	Renderer::GenShadowMaps(scene);
+	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		if (DEBUG_INFO) {
 			frameCount++;
 			FPS[indexFPS] = frameCount / (glfwGetTime() - lastTime);
@@ -663,38 +546,35 @@ int main(int argc, char** argv) {
 			lastTime = glfwGetTime();
 		}
 		if (scene.pointLight.enable) {
-			// scene.pointLight.position.z = static_cast<float>(sin(glfwGetTime()) * 3.0) * 3; // 3.0 speed, 3 radius
-			// scene.pointLight.position.x = static_cast<float>(cos(glfwGetTime()) * 3.0) * 3;
-			// scene.models[0]->meshes[0]->drawable = true;
-			// scene.models[0]->transform.position = scene.pointLight.position;
-			renderer->genShadowMaps(scene); // some sort of optimization
-		} else {
-			// scene.objects[0]->meshes[0]->drawable = false;
+			Renderer::GenShadowMaps(scene);
 		}
 
 		if (FLASHLIGHT) {
 			scene.spotLight.position = scene.camera.position;
 			scene.spotLight.position.y -= 2;
-			scene.spotLight.position.x -= 2;
 
 			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
-			renderer->genShadowMaps(scene); // some sort of optimization
+			Renderer::GenShadowMaps(scene);
 		}
 
 		scene.camera.updatePosition();
-		renderer->drawScene(scene);
-		renderer->renderFrame(effects);
+		updateControls();
+		Input::Update();
+
+		Renderer::DrawScene(scene);
+		Renderer::RenderFrame(effects);
 
 		// render imgui
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 		DrawOptions();
+		DrawKeymap();
 		if (DEBUG_INFO) DrawDebugInfo();
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-		glfwSwapBuffers(window);
+		glfwSwapBuffers(Renderer::g_window);
 		glfwPollEvents();
 	}
 
@@ -702,7 +582,7 @@ int main(int argc, char** argv) {
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
-	delete renderer;
+	Renderer::Shutdown();
 
 	glfwTerminate();
 	return 0;

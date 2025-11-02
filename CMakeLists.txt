@@ -3,7 +3,7 @@ project(chess3d C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
-find_package(Opengl REQUIRED)
+find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glad REQUIRED)
 find_package(glm REQUIRED)
@@ -26,7 +26,10 @@ set(SOURCE
  	"src/game/resource_manager.cpp"
 		"src/util.cpp"
 		src/render/shadow.cpp
-		src/render/shadow.hpp)
+		src/render/shadow.hpp
+		src/game/config.cpp
+		src/input/input.cpp
+		src/input/input.hpp)
 
 add_executable(chess3d ${SOURCE} )
 add_custom_command(
@@ -34,6 +37,12 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_directory
 	"${CMAKE_SOURCE_DIR}/assets"
 	"${CMAKE_BINARY_DIR}/assets" )
+
+add_custom_command(
+	TARGET chess3d POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+	"${CMAKE_SOURCE_DIR}/src/render/shaders"
+	"${CMAKE_BINARY_DIR}/shaders" )
 
 target_include_directories(chess3d PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(chess3d PRIVATE OpenGL::GL glad::glad glfw glm::glm imgui::imgui assimp::assimp)

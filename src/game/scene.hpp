@@ -3,7 +3,7 @@
 #include <vector>
 #include "../render/model.hpp"
 #include "camera.hpp"
-#include "light.hpp"
+#include "../render/light.hpp"
 
 struct Scene {
 	std::vector<Render::DrawableObjectPtr> objects;
