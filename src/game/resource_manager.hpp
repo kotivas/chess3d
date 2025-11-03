@@ -4,14 +4,15 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include "../render/text/MSDFText.hpp"
 
 namespace ResourceManager {
+	uint32_t CreateDefaultTexture(glm::ivec3 color1, glm::ivec3 color2);
+	uint32_t CreateTexture(const std::string& path);
 
-uint32_t CreateDefaultTexture(glm::ivec3 color1, glm::ivec3 color2);
-uint32_t CreateTexture(const std::string& path);
+	Render::MeshPtr ProcessMesh(aiMesh* aiMesh);
+	Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& modelName);
+	Render::ModelPtr LoadModel(const std::string& path, Render::ShaderPtr shader);
 
-Render::MeshPtr ProcessMesh(aiMesh* aiMesh);
-Render::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& modelName);
-Render::ModelPtr LoadModel(const std::string& path, Render::ShaderPtr shader);
-
+	MSDFText::FontPtr LoadMSDFFont(const std::string& pngPath, const std::string& jsonPath);
 }

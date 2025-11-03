@@ -3,6 +3,8 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 struct Effects {
+    float gamma;
+
     bool quantization;
     int quantizationLevel;
 
@@ -34,5 +36,5 @@ void main() {
     if (effects.quantization) color = quantizeColor(color, effects.quantizationLevel);
     if (effects.vignette) color = applyVignette(color);
 
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(pow(color, vec3(1.0/effects.gamma)), 1);
 }

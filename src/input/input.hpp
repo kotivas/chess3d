@@ -28,6 +28,6 @@ namespace Input {
 	extern int		g_resizedWidth;
 	extern int		g_resizedHeight;
 
-	extern std::bitset<350> keydownmap;
-	extern std::bitset<350> keypressedmap;
+	extern std::bitset<350> g_keydownmap;
+	extern std::bitset<350> g_keypressedmap;
 }

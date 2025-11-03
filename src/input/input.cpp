@@ -12,8 +12,8 @@ namespace Input {
 	int g_resizedWidth = 0;
 	int g_resizedHeight = 0;
 
-	std::bitset<350> keydownmap;
-	std::bitset<350> keypressedmap;
+	std::bitset<350> g_keydownmap;
+	std::bitset<350> g_keypressedmap;
 
 	void Init() {
 		glfwSetScrollCallback(Renderer::g_window, ScrollCallback);
@@ -37,16 +37,16 @@ namespace Input {
 		// Keyboard
 		for (int i = 32; i < 349; i++) {
 			if (glfwGetKey(Renderer::g_window, i) == GLFW_PRESS) {
-				if (!keydownmap[i]) {
-					keypressedmap[i] = true;
+				if (!g_keydownmap[i]) {
+					g_keypressedmap[i] = true;
 				} else {
-					keypressedmap[i] = false;
+					g_keypressedmap[i] = false;
 				}
 
-				keydownmap[i] = true;
+				g_keydownmap[i] = true;
 			} else {
-				keypressedmap[i] = false;
-				keydownmap[i] = false;
+				g_keypressedmap[i] = false;
+				g_keydownmap[i] = false;
 			}
 		}
 
@@ -58,11 +58,11 @@ namespace Input {
 	}
 
 	bool IsKeyDown(uint16_t key) {
-		return key < 350 ? keydownmap[key] : false;
+		return key < 350 ? g_keydownmap[key] : false;
 	}
 
 	bool IsKeyPressed(uint16_t key) {
-		return key < 350 ? keypressedmap[key] : false;
+		return key < 350 ? g_keypressedmap[key] : false;
 	}
 
 	bool IsLeftMouseDown() {

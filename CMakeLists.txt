@@ -29,7 +29,13 @@ set(SOURCE
 		src/render/shadow.hpp
 		src/game/config.cpp
 		src/input/input.cpp
-		src/input/input.hpp)
+		src/input/input.hpp
+		src/console/console.cpp
+		src/console/console.hpp
+		src/console/cmdsystem.cpp
+		src/console/cmdsystem.hpp
+		src/render/text/MSDFText.cpp
+		src/render/text/MSDFText.hpp)
 
 add_executable(chess3d ${SOURCE} )
 add_custom_command(
@@ -45,5 +51,5 @@ add_custom_command(
 	"${CMAKE_BINARY_DIR}/shaders" )
 
 target_include_directories(chess3d PRIVATE ${Stb_INCLUDE_DIR})
-target_link_libraries(chess3d PRIVATE OpenGL::GL glad::glad glfw glm::glm imgui::imgui assimp::assimp)
+target_link_libraries(chess3d PRIVATE OpenGL::GL glad::glad glfw glm::glm imgui::imgui assimp::assimp rapidjson)
 

@@ -21,6 +21,7 @@
 
 #include "stb_image_write.h"
 #include "util.hpp"
+#include "./render/text/MSDFText.hpp"
 
 // TODO make it json or smth
 static Scene scene{
@@ -43,7 +44,7 @@ static Scene scene{
 	},
 	.dirLight{
 		.enable = true,
-		.direction = {-0.5f, -1.0f, -0.5f},
+		.direction = {-0.5f, -0.2f, -1.f},
 		.ambient = glm::vec3(0.3f),
 		.diffuse = glm::vec3(0.8f),
 		.specular = glm::vec3(0.5f)
@@ -80,6 +81,8 @@ static Scene scene{
 	}
 };
 static Render::PostEffects effects{
+	.gamma = 2.2,
+
 	.quantization = false,
 	.quantizationLevel = 4,
 
@@ -114,7 +117,7 @@ void DrawKeymap() {
 	for (size_t i = 32; i < 350; ++i) {
 		ImGui::PushID(static_cast<int>(i));
 
-		bool state = Input::keydownmap[i];
+		bool state = Input::g_keydownmap[i];
 		ImVec4 color = state ? ImVec4(0.3f, 0.8f, 0.3f, 1.0f) : ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
 		ImGui::PushStyleColor(ImGuiCol_Button, color);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
@@ -150,6 +153,7 @@ void DrawOptions() {
 
 	if (ImGui::CollapsingHeader("Render Settings")) {
 		//ImGui::ColorEdit3("Void Color", &voidColor[0]);
+		ImGui::SliderFloat("gamma", &effects.gamma, 0, 10, "%.1f");
 		if (ImGui::InputInt2("Render Resolution", &g_config.renderRes[0])) {
 			Renderer::UpdateRenderRes();
 		}
@@ -381,7 +385,7 @@ void updateControls() {
 		scene.camera.locked = true;
 	}
 
-	if ( Input::g_resizedHeight || Input::g_resizedWidth ) {
+	if (Input::g_resizedHeight || Input::g_resizedWidth) {
 		if (Input::g_resizedWidth == 0 && Input::g_resizedHeight == 0) return; // in case of minimizing
 		g_config.windowRes = {Input::g_resizedWidth, Input::g_resizedHeight};
 		g_config.renderRes = {Input::g_resizedWidth, Input::g_resizedHeight};
@@ -481,13 +485,6 @@ void setupScene(bool props) {
 		};
 		scene.objects.push_back(toy);
 
-		// Render::ModelPtr chess = ResourceManager::LoadModel("assets/models/chess.fbx", shader);
-		// chess->transform = {
-		// .position = {-7, 16.28, 0},
-		// .scale = glm::vec3(0.3)
-		// };
-		// scene.objects.push_back(chess);
-
 		Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader);
 		desk->transform.scale = {20, 20, 20};
 		scene.objects.push_back(desk);
@@ -515,7 +512,7 @@ void setGlDebugOutput() {
 int main(int argc, char** argv) {
 	g_config = {
 		.windowRes = {1280, 720},
-		.renderRes = {1280, 720}, // 320, 240
+		.renderRes = {1920, 1080}, // 320, 240
 		.shadowRes = 2048,
 		// --- GRAPHICS ---
 		.renderDistance = 1000.f,
@@ -526,7 +523,7 @@ int main(int argc, char** argv) {
 	Renderer::Init();
 	Input::Init();
 	InitIMGUI();
-
+	MSDFText::Init();
 
 	// TODO make loading screen w/ progresbar
 	setupScene(true);
@@ -536,7 +533,9 @@ int main(int argc, char** argv) {
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
 
-	Renderer::GenShadowMaps(scene);
+	MSDFText::FontPtr font = ResourceManager::LoadMSDFFont("assets/fonts/inconsolata.png",
+	                                                       "assets/fonts/inconsolata.json");
+
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		if (DEBUG_INFO) {
 			frameCount++;
@@ -545,24 +544,26 @@ int main(int argc, char** argv) {
 			frameCount = 0;
 			lastTime = glfwGetTime();
 		}
-		if (scene.pointLight.enable) {
-			Renderer::GenShadowMaps(scene);
-		}
 
 		if (FLASHLIGHT) {
 			scene.spotLight.position = scene.camera.position;
 			scene.spotLight.position.y -= 2;
-
 			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
-			Renderer::GenShadowMaps(scene);
 		}
 
 		scene.camera.updatePosition();
 		updateControls();
 		Input::Update();
 
-		Renderer::DrawScene(scene);
-		Renderer::RenderFrame(effects);
+		Renderer::GenShadowMaps(scene);
+
+		Renderer::FrameBegin(scene);
+		for (const auto& object : scene.objects) object->draw({});
+		MSDFText::DrawText("dev test", font, 0, g_config.renderRes.y - font->lineHeight * 48, 32, glm::vec4(1));
+		/* не ну вроде нормально вишло даже 😎🤙🏿
+		приготовить и гамму пофиксить
+		 */
+		Renderer::FrameEnd(effects);
 
 		// render imgui
 		ImGui_ImplOpenGL3_NewFrame();
@@ -583,6 +584,7 @@ int main(int argc, char** argv) {
 	ImGui::DestroyContext();
 
 	Renderer::Shutdown();
+	// Input::Shutdown();
 
 	glfwTerminate();
 	return 0;

@@ -1,8 +1,14 @@
 #include "renderer.hpp"
+#include "../game/config.hpp"
 
 namespace Renderer {
 	void Init() {
-		FBO, RBO, UBOMatrices, quadVAO, quadVBO, textureColorBuffer = 0;
+		FBO = 0;
+		RBO = 0;
+		UBOMatrices = 0;
+		quadVAO = 0;
+		quadVBO = 0;
+		textureColorBuffer = 0;
 
 		InitGLFW();
 
@@ -10,7 +16,6 @@ namespace Renderer {
 
 		glViewport(0, 0, g_config.windowRes.x, g_config.windowRes.y);
 
-		glEnable(GL_FRAMEBUFFER_SRGB); // gamma correction
 		glEnable(GL_DEPTH_TEST);
 
 		glEnable(GL_CULL_FACE); // Включаем отсечение задних граней
@@ -262,7 +267,7 @@ namespace Renderer {
 		glCullFace(GL_BACK);
 	}
 
-	void DrawScene(Scene& scene) {
+	void FrameBegin(Scene& scene) {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO); // draw everything in custom framebuffer
 
 		UpdateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
@@ -281,21 +286,18 @@ namespace Renderer {
 
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
-
-		for (auto& object : scene.objects) {
-			object->draw({});
-		}
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0); // set default framebuffer
 	}
 
-	void RenderFrame(Render::PostEffects effects) {
+	void FrameEnd(Render::PostEffects effects) {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
 
 		glViewport(0, 0, g_config.windowRes.x, g_config.windowRes.y);
 
 		postfxShader.use();
+
+		postfxShader.setUniform1f("effects.gamma", effects.gamma);
+
 		postfxShader.setUniform1i("effects.quantization", effects.quantization);
 		postfxShader.setUniform1i("effects.quantizationLevel", effects.quantizationLevel);
 		postfxShader.setUniform2f("resolution", g_config.windowRes);
@@ -310,7 +312,6 @@ namespace Renderer {
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		glEnable(GL_DEPTH_TEST);
-
 		RenderClear();
 	}
 

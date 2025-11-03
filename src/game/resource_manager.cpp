@@ -6,11 +6,127 @@
 #include <stb_image.h>
 
 #include "../util.hpp"
-
+#include <rapidjson/document.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/istreamwrapper.h>
+#include <fstream>
 #include <filesystem>
 
 namespace ResourceManager {
 	static uint32_t defaultTexture;
+
+	MSDFText::FontPtr LoadMSDFFont(const std::string& pngPath, const std::string& jsonPath) {
+		MSDFText::FontPtr font = std::make_shared<MSDFText::Font>();
+
+		int w, h, channels;
+		stbi_set_flip_vertically_on_load(true); // keep true if you generated with --yorigin bottom
+		unsigned char* data = stbi_load(pngPath.c_str(), &w, &h, &channels, 0);
+		if (!data) {
+			std::cerr << "[MSDF] Failed to load texture: " << pngPath << "\n";
+			return nullptr;
+		}
+
+		font->atlasW = w;
+		font->atlasH = h;
+
+		GLint format = (channels == 3) ? GL_RGB : GL_RGBA;
+
+		glGenTextures(1, &font->atlas);
+		glBindTexture(GL_TEXTURE_2D, font->atlas);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+		glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+
+		// Important: no mipmaps, only linear filtering
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // no mip levels
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+		// 👇 Clamp to edge (prevent bleeding between glyphs)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		stbi_image_free(data);
+
+		// --- Load JSON metadata ---
+		// FILE* fp = fopen(jsonPath.c_str(), "rb");
+		std::ifstream jsonfile(jsonPath);
+		if (!jsonfile.good()) {
+			std::cerr << "[MSDF] Failed to open JSON: " << jsonPath << "\n";
+			return font;
+		}
+
+		char readBuffer[65536];
+		rapidjson::IStreamWrapper is(jsonfile, readBuffer, sizeof(readBuffer));
+		rapidjson::Document doc;
+		doc.ParseStream(is);
+
+		jsonfile.close();
+
+		if (!doc.IsObject()) {
+			std::cerr << "[MSDF] Invalid JSON format in: " << jsonPath << "\n";
+			return font;
+		}
+
+		// --- Parse atlas info ---
+		if (!doc.HasMember("atlas") || !doc["atlas"].IsObject()) {
+			std::cerr << "[MSDF] Missing atlas section in metadata\n";
+			return nullptr;
+		}
+
+		const auto& atlas = doc["atlas"];
+		font->distanceRange = atlas["distanceRange"].GetFloat();
+		font->atlasW = atlas["width"].GetInt();
+		font->atlasH = atlas["height"].GetInt();
+
+		// --- Parse metrics ---
+		if (!doc.HasMember("metrics") || !doc["metrics"].IsObject()) {
+			std::cerr << "[MSDF] Missing metrics section\n";
+			return nullptr;
+		}
+
+		const auto& metrics = doc["metrics"];
+		font->lineHeight = metrics["lineHeight"].GetFloat();
+		font->ascender = metrics["ascender"].GetFloat();
+		font->descender = metrics["descender"].GetFloat();
+
+		// --- Parse glyphs ---
+		if (!doc.HasMember("glyphs") || !doc["glyphs"].IsArray()) {
+			std::cerr << "[MSDF] Missing glyph array\n";
+			return nullptr;
+		}
+
+		const auto& glyphs = doc["glyphs"];
+		for (const auto& g : glyphs.GetArray()) {
+			MSDFText::Glyph glyph{};
+			glyph.codepoint = g["unicode"].GetUint();
+			glyph.advance = g["advance"].GetFloat();
+
+			if (g.HasMember("planeBounds")) {
+				const auto& plane = g["planeBounds"];
+				glyph.planeLeft = plane["left"].GetFloat();
+				glyph.planeBottom = plane["bottom"].GetFloat();
+				glyph.planeRight = plane["right"].GetFloat();
+				glyph.planeTop = plane["top"].GetFloat();
+			}
+
+			if (g.HasMember("atlasBounds")) {
+				const auto& ab = g["atlasBounds"];
+				glyph.uvLeft = ab["left"].GetFloat() / font->atlasW;
+				glyph.uvRight = ab["right"].GetFloat() / font->atlasW;
+				glyph.uvBottom = ab["bottom"].GetFloat() / font->atlasH;
+				glyph.uvTop = ab["top"].GetFloat() / font->atlasH;
+			}
+
+			font->glyphs[glyph.codepoint] = glyph;
+		}
+
+		std::cout << "[MSDF] Loaded font: " << font->glyphs.size()
+			<< " glyphs (" << w << "x" << h << " atlas)\n";
+
+		return font;
+	}
 
 	uint32_t CreateDefaultTexture(glm::ivec3 color1, glm::ivec3 color2) {
 		// Создание данных для текстуры 2x2 RGBA
@@ -62,6 +178,7 @@ namespace ResourceManager {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		// Load image, create texture and generate mipmaps
+		stbi_set_flip_vertically_on_load(false);
 		unsigned char* image = stbi_load(path.c_str(), &width, &height, 0, 3);
 
 		if (!image) {
