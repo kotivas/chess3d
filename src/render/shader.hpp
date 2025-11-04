@@ -13,40 +13,33 @@
 #include <memory>
 
 namespace Render {
+	struct Shader {
+		Shader();
 
-class Shader {
-public:
-	Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
-	Shader();
+		void use();
 
-	void use();
+		// TODO isLoaded
 
-	// TODO isLoaded
+		GLuint getID() const;
 
-	GLuint getID() const;
+		void setUniform1i(const std::string& name, int v0) const;
+		void setUniform2i(const std::string& name, int v0, int v1) const;
+		void setUniform3i(const std::string& name, int v0, int v1, int v2) const;
+		void setUniform4i(const std::string& name, int v0, int v1, int v2, int v3) const;
 
-	void loadShader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
+		void setUniform1f(const std::string& name, float v0) const;
+		void setUniform2f(const std::string& name, float v0, float v1) const;
+		void setUniform2f(const std::string& name, glm::vec2 v) const;
+		void setUniform3f(const std::string& name, float v0, float v1, float v2) const;
+		void setUniform3f(const std::string& name, glm::vec3 v) const;
+		void setUniform4f(const std::string& name, float v0, float v1, float v2, float v3) const;
+		void setUniform4f(const std::string& name, glm::vec4 v) const;
 
-	void setUniform1i(const std::string& name, int v0) const;
-	void setUniform2i(const std::string& name, int v0, int v1) const;
-	void setUniform3i(const std::string& name, int v0, int v1, int v2) const;
-	void setUniform4i(const std::string& name, int v0, int v1, int v2, int v3) const;
+		void setUniformMat4fv(const std::string& name, GLboolean transpose, glm::mat4& value) const;
 
-    void setUniform1f(const std::string& name, float v0) const;
-	void setUniform2f(const std::string& name, float v0, float v1) const;
-	void setUniform2f(const std::string& name, glm::vec2 v) const;
-	void setUniform3f(const std::string& name, float v0, float v1, float v2) const;
-	void setUniform3f(const std::string& name, glm::vec3 v) const;
-	void setUniform4f(const std::string& name, float v0, float v1, float v2, float v3) const;
-	void setUniform4f(const std::string& name, glm::vec4 v) const;
 
-	void setUniformMat4fv(const std::string& name, GLboolean transpose, glm::mat4& value) const;
+		GLuint _id;
+	};
 
-private:
-	GLuint createShader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
-	GLuint compileShader(GLenum shaderType, const std::string src);
-
-	GLuint _id;
-};
-using ShaderPtr = std::shared_ptr<Shader>;
+	using ShaderPtr = std::shared_ptr<Shader>;
 }

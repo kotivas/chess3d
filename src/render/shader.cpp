@@ -3,10 +3,7 @@
 #include <iostream>
 
 namespace Render {
-
-Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
-	_id = createShader(vertexPath, fragmentPath, geometryPath);
-}
+	
 
 Shader::Shader()
 	: _id(0) {}
@@ -17,54 +14,6 @@ void Shader::use() {
 
 GLuint Shader::getID() const {
 	return _id;
-}
-
-void Shader::loadShader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
-	_id = createShader(vertexPath, fragmentPath, geometryPath);
-}
-
-GLuint Shader::compileShader(GLenum shaderType, const std::string src) {
-	GLuint id = glCreateShader(shaderType);
-	const char* raw = src.c_str();
-
-	glShaderSource(id, 1, &raw, nullptr);
-	glCompileShader(id);
-
-	GLint success;
-	glGetShaderiv(id, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		char infoLog[512];
-		glGetShaderInfoLog(id, 512, nullptr, infoLog);
-		std::cout << OUT_ERROR << "Shader compilation failed:" << infoLog << std::endl;
-		return 0;
-	}
-
-	return id;
-}
-
-GLuint Shader::createShader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
-
-	GLuint vs = compileShader(GL_VERTEX_SHADER, Util::readFromFile(vertexPath));
-	GLuint fs = compileShader(GL_FRAGMENT_SHADER, Util::readFromFile(fragmentPath));
-	GLuint gs = 0;
-	if (!geometryPath.empty()) gs = compileShader(GL_GEOMETRY_SHADER, Util::readFromFile(geometryPath));
-
-	GLuint program = glCreateProgram();
-
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
-	if (gs) glAttachShader(program, gs);
-
-	glLinkProgram(program);
-	glValidateProgram(program);
-
-	glDeleteShader(vs);
-	glDeleteShader(fs);
-	if (gs) glDeleteShader(gs);
-
-	std::cout << OUT_DEBUG << "Shader loaded: " << vertexPath << " " << fragmentPath << " " << geometryPath << std::endl;
-
-	return program;
 }
 
 // ------------------------------------------------------------------------

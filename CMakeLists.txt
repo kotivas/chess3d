@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.8)
+﻿cmake_minimum_required (VERSION 3.14)
 project(chess3d C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -16,15 +16,17 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 	set(CMAKE_CXX_FLAGS_DEBUG "/MDd /ZI /Ob0 /Od /RTC1")
 endif()
 
+include_directories(${PROJECT_SOURCE_DIR}/src)
+
 set(SOURCE 
-	"src/main.cpp"
-	"src/game/camera.cpp"
-	"src/render/shader.cpp"
-	"src/render/renderer.cpp"
-	"src/render/model.cpp"
-	"src/game/game.cpp"
- 	"src/game/resource_manager.cpp"
-		"src/util.cpp"
+		src/main.cpp
+		src/game/camera.cpp
+		src/render/shader.cpp
+		src/render/renderer.cpp
+		src/render/model.cpp
+		src/game/game.cpp
+ 		src/resourcemgr/resourcemgr.cpp
+		src/util.cpp
 		src/render/shadow.cpp
 		src/render/shadow.hpp
 		src/game/config.cpp
@@ -34,8 +36,12 @@ set(SOURCE
 		src/console/console.hpp
 		src/console/cmdsystem.cpp
 		src/console/cmdsystem.hpp
-		src/render/text/MSDFText.cpp
-		src/render/text/MSDFText.hpp)
+		src/text/MSDFText.cpp
+		src/text/MSDFText.hpp
+		src/resourcemgr/resourcemgr_model.cpp
+		src/resourcemgr/resourcemgr_shader.cpp
+		src/core/logger.cpp
+		src/core/logger.hpp)
 
 add_executable(chess3d ${SOURCE} )
 add_custom_command(

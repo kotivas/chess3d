@@ -1,6 +1,82 @@
 #include "util.hpp"
 
+#include "core/logger.hpp"
+
 namespace Util {
+	void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length,
+	                            const char* message, const void* userParam) {
+		// ignore non-significant error/warning codes
+		// if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+		if (id == 131204 || id == 131185) return;
+
+		std::string severityStr;
+		std::string sourceStr;
+		std::string typeStr;
+		Logger::Severity logSeverity = Logger::Severity::Debug;
+
+		switch (severity) {
+		case GL_DEBUG_SEVERITY_HIGH:
+			severityStr = "high";
+			logSeverity = Logger::Severity::Error;
+			break;
+		case GL_DEBUG_SEVERITY_MEDIUM:
+			severityStr = "medium";
+			logSeverity = Logger::Severity::Warning;
+			break;
+		case GL_DEBUG_SEVERITY_LOW:
+			severityStr = "low";
+			logSeverity = Logger::Severity::Info;
+			break;
+		case GL_DEBUG_SEVERITY_NOTIFICATION:
+			severityStr = "info";
+			logSeverity = Logger::Severity::Debug;
+			break;
+		default: severityStr = "unknown";
+		}
+
+		switch (source) {
+		case GL_DEBUG_SOURCE_API: sourceStr = "API";
+			break;
+		case GL_DEBUG_SOURCE_WINDOW_SYSTEM: sourceStr = "Window System";
+			break;
+		case GL_DEBUG_SOURCE_SHADER_COMPILER: sourceStr = "Shader Compiler";
+			break;
+		case GL_DEBUG_SOURCE_THIRD_PARTY: sourceStr = "Third Party";
+			break;
+		case GL_DEBUG_SOURCE_APPLICATION: sourceStr = "Application";
+			break;
+		case GL_DEBUG_SOURCE_OTHER: sourceStr = "Other";
+			break;
+		default: sourceStr = "unknown";
+		}
+
+		switch (type) {
+		case GL_DEBUG_TYPE_ERROR: typeStr = "Error";
+			break;
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: typeStr = "Deprecated Behaviour";
+			break;
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: typeStr = "Undefined Behaviour";
+			break;
+		case GL_DEBUG_TYPE_PORTABILITY: typeStr = "Portability";
+			break;
+		case GL_DEBUG_TYPE_PERFORMANCE: typeStr = "Performance";
+			break;
+		case GL_DEBUG_TYPE_MARKER: typeStr = "Marker";
+			break;
+		case GL_DEBUG_TYPE_PUSH_GROUP: typeStr = "Push Group";
+			break;
+		case GL_DEBUG_TYPE_POP_GROUP: typeStr = "Pop Group";
+			break;
+		case GL_DEBUG_TYPE_OTHER: typeStr = "Other";
+			break;
+		default: typeStr = "unknown";
+		}
+
+		std::string msg = "GL (" + severityStr + "; " + sourceStr + "; " + typeStr + "): " + message + " (" +
+			std::to_string(id) + ")";
+		Log::Log(logSeverity, msg);
+	}
+
 	Render::MeshPtr CreatePlaneMesh(float shininess, const std::string& name) {
 		Render::MeshPtr mesh = std::make_shared<Render::Mesh>();;
 		Render::MaterialPtr mat = std::make_shared<Render::Material>();
@@ -8,7 +84,7 @@ namespace Util {
 		// setup material
 
 		mat->name = name;
-		mat->diffuse[0] = ResourceManager::CreateDefaultTexture({200, 200, 200}, {200, 200, 200}); // TODO solid color
+		mat->diffuse[0] = ResourceMgr::CreateDefaultTexture({200, 200, 200}, {200, 200, 200}); // TODO solid color
 		mat->shininess = shininess;
 
 		// setup mesh
@@ -123,7 +199,7 @@ namespace Util {
 		std::ifstream fileStream(path, std::ios::in);
 
 		if (!fileStream.is_open()) {
-			std::cout << OUT_ERROR << "Could not open file: " << path << std::endl;
+			Log::Error("Could`nt open file " + path);
 			return "";
 		}
 

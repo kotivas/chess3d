@@ -1,14 +1,11 @@
 #include "MSDFText.hpp"
-#include "../../game/resource_manager.hpp"
-#include "../../game/config.hpp"
+#include "resourcemgr/resourcemgr.hpp"
+#include "game/config.hpp"
 
 namespace MSDFText {
 	GLuint vao = 0, vbo = 0;
-	Render::Shader shader;
 
 	void Init() {
-		shader.loadShader("shaders/msdf_text.vert", "shaders/msdf_text.frag");
-
 		glGenVertexArrays(1, &vao);
 		glGenBuffers(1, &vbo);
 	}
@@ -65,7 +62,6 @@ namespace MSDFText {
 			verts.push_back({gx0, gy0, u0, v0});
 
 			penX += g.advance * scale;
-
 		}
 
 		if (verts.empty()) return;
@@ -82,19 +78,19 @@ namespace MSDFText {
 		glEnableVertexAttribArray(uvLoc);
 		glVertexAttribPointer(uvLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Vtx), (void*)(2 * sizeof(float)));
 
-		shader.use();
+		ResourceMgr::GetShaderByName("msdf_text")->use();
 
 		glm::mat4 proj = glm::ortho(0.0f, static_cast<float>(g_config.renderRes.x), 0.0f,
 		                            static_cast<float>(g_config.renderRes.y));
 
-		shader.setUniformMat4fv("uProjection", false, proj);
-		shader.setUniform4f("uColor", color.r, color.g, color.b, color.a);
-		shader.setUniform1f("uScale", scale);
-		shader.setUniform1f("uPxRange", font->distanceRange);
+		ResourceMgr::GetShaderByName("msdf_text")->setUniformMat4fv("uProjection", false, proj);
+		ResourceMgr::GetShaderByName("msdf_text")->setUniform4f("uColor", color.r, color.g, color.b, color.a);
+		ResourceMgr::GetShaderByName("msdf_text")->setUniform1f("uScale", scale);
+		ResourceMgr::GetShaderByName("msdf_text")->setUniform1f("uPxRange", font->distanceRange);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, font->atlas);
-		shader.setUniform1i("uAtlas", 0);
+		ResourceMgr::GetShaderByName("msdf_text")->setUniform1i("uAtlas", 0);
 
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

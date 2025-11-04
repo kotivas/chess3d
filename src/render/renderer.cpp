@@ -1,5 +1,8 @@
 #include "renderer.hpp"
+
+#include "util.hpp"
 #include "../game/config.hpp"
+#include "resourcemgr/resourcemgr.hpp"
 
 namespace Renderer {
 	void Init() {
@@ -12,7 +15,13 @@ namespace Renderer {
 
 		InitGLFW();
 
-		postfxShader.loadShader("shaders/postfx.vert", "shaders/postfx.frag");
+		int flags;
+		glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+		if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+			glEnable(GL_DEBUG_OUTPUT);
+			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+			glDebugMessageCallback(Util::glDebugOutput, nullptr);
+		}
 
 		glViewport(0, 0, g_config.windowRes.x, g_config.windowRes.y);
 
@@ -23,21 +32,12 @@ namespace Renderer {
 		glFrontFace(GL_CCW); // Указываем порядок вершин для лицевых граней (CCW по умолчанию)
 
 		// work with shadows
-		Render::ShaderPtr dirShader = std::make_shared<Render::Shader>("shaders/depth.vert",
-		                                                               "shaders/depth.frag");
-		spotShadow.shader = dirShader;
 		spotShadow.resolution = g_config.shadowRes; // todo maybe i should split it
 		spotShadow.generate();
 
-		dirShadow.shader = dirShader;
 		dirShadow.resolution = g_config.shadowRes;
 		dirShadow.generate();
 
-		Render::ShaderPtr omniShader = std::make_shared<Render::Shader>("shaders/point_shadow_depth.vert",
-		                                                                "shaders/point_shadow_depth.frag",
-		                                                                "shaders/point_shadow_depth.geom");
-
-		pointShadow.shader = omniShader;
 		pointShadow.resolution = g_config.shadowRes;
 		pointShadow.generate();
 
@@ -207,11 +207,12 @@ namespace Renderer {
 			glBindFramebuffer(GL_FRAMEBUFFER, dirShadow.shadowMapFBO);
 			glClear(GL_DEPTH_BUFFER_BIT);
 
-			dirShadow.shader->use();
-			dirShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, dirShadow.lightSpaceMatrix);
+			ResourceMgr::GetShaderByName("depth")->use();
+			ResourceMgr::GetShaderByName("depth")->setUniformMat4fv("u_LightSpaceMatrix", false,
+			                                                        dirShadow.lightSpaceMatrix);
 
 			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(dirShadow.shader, {});
+				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("depth"), {});
 			}
 		}
 		if (scene.spotLight.enable) {
@@ -223,11 +224,12 @@ namespace Renderer {
 			glBindFramebuffer(GL_FRAMEBUFFER, spotShadow.shadowMapFBO);
 			glClear(GL_DEPTH_BUFFER_BIT);
 
-			spotShadow.shader->use();
-			spotShadow.shader->setUniformMat4fv("u_LightSpaceMatrix", false, spotShadow.lightSpaceMatrix);
+			ResourceMgr::GetShaderByName("depth")->use();
+			ResourceMgr::GetShaderByName("depth")->setUniformMat4fv("u_LightSpaceMatrix", false,
+			                                                        spotShadow.lightSpaceMatrix);
 
 			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(spotShadow.shader, {});
+				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("depth"), {});
 			}
 		}
 		if (scene.pointLight.enable) {
@@ -238,21 +240,27 @@ namespace Renderer {
 			glBindFramebuffer(GL_FRAMEBUFFER, pointShadow.shadowCubemapFBO);
 			glClear(GL_DEPTH_BUFFER_BIT);
 
-			pointShadow.shader->use();
+			ResourceMgr::GetShaderByName("point_shadow_depth")->use();
 
 			// TODO возможно я могу как то сделать, что бы за раз передавать 6 матриц
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[0]", false, pointShadow.transforms[0]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[1]", false, pointShadow.transforms[1]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[2]", false, pointShadow.transforms[2]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[3]", false, pointShadow.transforms[3]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[4]", false, pointShadow.transforms[4]);
-			pointShadow.shader->setUniformMat4fv("shadowMatrices[5]", false, pointShadow.transforms[5]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[0]", false, pointShadow.transforms[0]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[1]", false, pointShadow.transforms[1]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[2]", false, pointShadow.transforms[2]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[3]", false, pointShadow.transforms[3]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[4]", false, pointShadow.transforms[4]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[5]", false, pointShadow.transforms[5]);
 
-			pointShadow.shader->setUniform1f("far_plane", g_config.renderDistance);
-			pointShadow.shader->setUniform3f("lightPos", scene.pointLight.position);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform1f("far_plane", g_config.renderDistance);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform3f("lightPos", scene.pointLight.position);
 
 			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(pointShadow.shader, {});
+				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("point_shadow_depth"), {});
 			}
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -294,17 +302,20 @@ namespace Renderer {
 
 		glViewport(0, 0, g_config.windowRes.x, g_config.windowRes.y);
 
-		postfxShader.use();
 
-		postfxShader.setUniform1f("effects.gamma", effects.gamma);
+		Render::ShaderPtr postfxShader = ResourceMgr::GetShaderByName("postfx");
 
-		postfxShader.setUniform1i("effects.quantization", effects.quantization);
-		postfxShader.setUniform1i("effects.quantizationLevel", effects.quantizationLevel);
-		postfxShader.setUniform2f("resolution", g_config.windowRes);
+		postfxShader->use();
 
-		postfxShader.setUniform1i("effects.vignette", effects.vignette);
-		postfxShader.setUniform1f("effects.vignetteIntensity", effects.vignetteIntensity);
-		postfxShader.setUniform3f("effects.vignetteColor", effects.vignetteColor);
+		postfxShader->setUniform1f("effects.gamma", effects.gamma);
+
+		postfxShader->setUniform1i("effects.quantization", effects.quantization);
+		postfxShader->setUniform1i("effects.quantizationLevel", effects.quantizationLevel);
+		postfxShader->setUniform2f("resolution", g_config.windowRes);
+
+		postfxShader->setUniform1i("effects.vignette", effects.vignette);
+		postfxShader->setUniform1f("effects.vignetteIntensity", effects.vignetteIntensity);
+		postfxShader->setUniform3f("effects.vignetteColor", effects.vignetteColor);
 
 		glBindVertexArray(quadVAO);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
@@ -330,6 +341,67 @@ namespace Renderer {
 	// 	}
 	// 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// }
+
+
+	void DrawRectOnScreen(float x, float y, float w, float h, const glm::vec4& color) {
+		Render::ShaderPtr shader = ResourceMgr::GetShaderByName("solidcolor");
+
+		shader->use();
+
+		// Устанавливаем матрицу модели
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(x, y, 0.0f));
+		model = glm::scale(model, glm::vec3(w, h, 1.0f));
+
+		shader->setUniformMat4fv("uModel", false, model);
+
+		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.renderRes.x, (float)g_config.renderRes.y, 0.0f);
+
+		shader->setUniformMat4fv("uProjection", false, projection);
+
+		shader->setUniform4f("color", color);
+
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_DEPTH_TEST);
+	}
+
+	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h) {
+		Render::ShaderPtr shader = ResourceMgr::GetShaderByName("texture");
+
+		shader->use();
+
+		// Устанавливаем матрицу модели
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(x, y, 0.0f));
+		model = glm::scale(model, glm::vec3(w, h, 1.0f));
+
+		shader->setUniformMat4fv("uModel", false, model);
+
+		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.renderRes.x, (float)g_config.renderRes.y, 0.0f);
+
+		shader->setUniformMat4fv("uProjection", false, projection);
+
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture);
+
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_DEPTH_TEST);
+	}
 
 	void Shutdown() {
 		glDeleteFramebuffers(1, &FBO);

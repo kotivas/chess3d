@@ -1,10 +1,10 @@
 // it is what it is
 #include <algorithm>
 #include <array>
-#include <iostream>
+#include <string>
 
 #include "game/config.hpp"
-#include "game/resource_manager.hpp"
+#include "resourcemgr/resourcemgr.hpp"
 #include "game/scene.hpp"
 #include "render/model.hpp"
 #include "render/renderer.hpp"
@@ -21,7 +21,9 @@
 
 #include "stb_image_write.h"
 #include "util.hpp"
-#include "./render/text/MSDFText.hpp"
+#include "./text/MSDFText.hpp"
+#include "console/console.hpp"
+#include "core/logger.hpp"
 
 // TODO make it json or smth
 static Scene scene{
@@ -361,7 +363,7 @@ void SaveScreenshot(const char* filename) {
 	// Сохранение в PNG
 	stbi_write_png(filename, g_config.windowRes.x, g_config.windowRes.y, 3, flippedPixels.data(),
 	               g_config.windowRes.x * 3);
-	std::cout << OUT_INFO << "Screenshot saved as " << filename << std::endl;
+	Log::Info("Screenshot saved as " + std::string(filename));
 }
 
 void updateControls() {
@@ -372,12 +374,14 @@ void updateControls() {
 	} else if (Input::IsKeyPressed(GLFW_KEY_F12)) {
 		DEBUG_INFO = !DEBUG_INFO;
 	} else if (Input::IsKeyPressed(GLFW_KEY_F)) {
-		std::cout << OUT_DEBUG << "Flashlight: " << (FLASHLIGHT ? "on" : "off") << std::endl;
 		FLASHLIGHT = !FLASHLIGHT;
+		Log::Debug("Flashlight: " + std::string(FLASHLIGHT ? "on" : "off"));
 		scene.spotLight.enable = FLASHLIGHT;
 	} else if (Input::IsKeyPressed(GLFW_KEY_P)) {
 		scene.pointLight.enable = !scene.pointLight.enable;
 	}
+
+	if (Input::IsKeyPressed(GLFW_KEY_GRAVE_ACCENT)) Console::Toggle();
 
 	if (Input::IsRightMouseDown()) {
 		scene.camera.locked = false;
@@ -397,87 +401,21 @@ void updateControls() {
 	scene.camera.mouseScrolled(Input::GetScrollYOffset(), g_config.renderDistance);
 }
 
-void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length,
-                            const char* message, const void* userParam) {
-	// ignore non-significant error/warning codes
-	// if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
-	if (id == 131204 || id == 131185) return;
-
-	std::cout << OUT_DEBUG << "(";
-
-	switch (severity) {
-	case GL_DEBUG_SEVERITY_HIGH: std::cout << "high";
-		break;
-	case GL_DEBUG_SEVERITY_MEDIUM: std::cout << "medium";
-		break;
-	case GL_DEBUG_SEVERITY_LOW: std::cout << "low";
-		break;
-	case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "info";
-		break;
-	default: std::cout << "unknown";
-	}
-	std::cout << "; ";
-
-	switch (source) {
-	case GL_DEBUG_SOURCE_API: std::cout << "API";
-		break;
-	case GL_DEBUG_SOURCE_WINDOW_SYSTEM: std::cout << "Window System";
-		break;
-	case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Shader Compiler";
-		break;
-	case GL_DEBUG_SOURCE_THIRD_PARTY: std::cout << "Third Party";
-		break;
-	case GL_DEBUG_SOURCE_APPLICATION: std::cout << "Application";
-		break;
-	case GL_DEBUG_SOURCE_OTHER: std::cout << "Other";
-		break;
-	default: std::cout << "unknown";
-	}
-	std::cout << "; ";
-
-	switch (type) {
-	case GL_DEBUG_TYPE_ERROR: std::cout << "Error";
-		break;
-	case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Deprecated Behaviour";
-		break;
-	case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: std::cout << "Undefined Behaviour";
-		break;
-	case GL_DEBUG_TYPE_PORTABILITY: std::cout << "Portability";
-		break;
-	case GL_DEBUG_TYPE_PERFORMANCE: std::cout << "Performance";
-		break;
-	case GL_DEBUG_TYPE_MARKER: std::cout << "Marker";
-		break;
-	case GL_DEBUG_TYPE_PUSH_GROUP: std::cout << "Push Group";
-		break;
-	case GL_DEBUG_TYPE_POP_GROUP: std::cout << "Pop Group";
-		break;
-	case GL_DEBUG_TYPE_OTHER: std::cout << "Other";
-		break;
-	default: std::cout << "unknown";
-	}
-
-	std::cout << "): " << message << " (" << id << ")" << std::endl;
-}
-
 void setupScene(bool props) {
 	// setup chess set
 
-	Render::ShaderPtr shader = std::make_shared<Render::Shader>("shaders/scene.vert",
-	                                                            "shaders/scene.frag");
-
 	if (props) {
 		// Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
-		Render::MeshPtr lightBulb = Util::CreateSphereMesh(0.1, 32, 32);
-		lightBulb->castShadow = false;
-		lightBulb->name = "LightBulb";
-		lightBulb->material = std::make_shared<Render::Material>();
-		lightBulb->material->shader = std::make_shared<Render::Shader>("shaders/light.vert",
-		                                                               "shaders/light.frag");
-		lightBulb->material->shininess = 255;
-		scene.objects.push_back(lightBulb);
+		// Render::MeshPtr lightBulb = Util::CreateSphereMesh(0.1, 32, 32);
+		// lightBulb->castShadow = false;
+		// lightBulb->name = "LightBulb";
+		// lightBulb->material = std::make_shared<Render::Material>();
+		// lightBulb->material->shader = std::make_shared<Render::Shader>("shaders/light.vert",
+		//                                                                "shaders/light.frag");
+		// lightBulb->material->shininess = 255;
+		// scene.objects.push_back(lightBulb);
 
-		Render::ModelPtr toy = ResourceManager::LoadModel("assets/models/slayer_toy.obj", shader);
+		Render::ModelPtr toy = ResourceMgr::GetModelByName("slayer_toy");
 		toy->transform = {
 			.position = {-5, 16, 0},
 			.rotation = {-90, 0, -45},
@@ -485,7 +423,7 @@ void setupScene(bool props) {
 		};
 		scene.objects.push_back(toy);
 
-		Render::ModelPtr desk = ResourceManager::LoadModel("assets/models/desk.obj", shader);
+		Render::ModelPtr desk = ResourceMgr::GetModelByName("desk");
 		desk->transform.scale = {20, 20, 20};
 		scene.objects.push_back(desk);
 	}
@@ -494,19 +432,30 @@ void setupScene(bool props) {
 
 	Render::MeshPtr floor = Util::CreatePlaneMesh(8, "floor_plane");
 	floor->transform.scale = glm::vec3(g_config.renderDistance);
-	floor->material->shader = shader;
+	floor->material->shader = ResourceMgr::GetShaderByName("scene");
 	floor->castShadow = false;
 	scene.objects.push_back(floor);
 }
 
-void setGlDebugOutput() {
-	int flags;
-	glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
-	if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
-		glEnable(GL_DEBUG_OUTPUT);
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-		glDebugMessageCallback(glDebugOutput, nullptr);
-	}
+void LoadAll() {
+	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata_light.png",
+	                          "assets/fonts/inconsolata_light.json");
+
+	// ALL SHADERS
+	ResourceMgr::LoadShader("postfx", "shaders/postfx.vert",
+	                        "shaders/postfx.frag");
+	ResourceMgr::LoadShader("depth", "shaders/depth.vert",
+	                        "shaders/depth.frag");
+	ResourceMgr::LoadShader("point_shadow_depth", "shaders/point_shadow_depth.vert", "shaders/point_shadow_depth.frag",
+	                        "shaders/point_shadow_depth.geom");
+	ResourceMgr::LoadShader("msdf_text", "shaders/msdf_text.vert", "shaders/msdf_text.frag");
+	ResourceMgr::LoadShader("scene", "shaders/scene.vert", "shaders/scene.frag");
+	ResourceMgr::LoadShader("solidcolor", "shaders/solidcolor.vert", "shaders/solidcolor.frag");
+
+	// ALL MODELS
+
+	ResourceMgr::LoadModel("slayer_toy", "assets/models/slayer_toy.obj", ResourceMgr::GetShaderByName("scene"));
+	ResourceMgr::LoadModel("desk", "assets/models/desk.obj", ResourceMgr::GetShaderByName("scene"));
 }
 
 int main(int argc, char** argv) {
@@ -519,9 +468,12 @@ int main(int argc, char** argv) {
 		.vsync = true,
 		.fillColor = {0.3, 0.3, 0.3}
 	};
+	Log::Init();
 
 	Renderer::Init();
+	LoadAll();
 	Input::Init();
+	Console::Init();
 	InitIMGUI();
 	MSDFText::Init();
 
@@ -532,9 +484,6 @@ int main(int argc, char** argv) {
 	double lastTime = glfwGetTime();
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
-
-	MSDFText::FontPtr font = ResourceManager::LoadMSDFFont("assets/fonts/inconsolata.png",
-	                                                       "assets/fonts/inconsolata.json");
 
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		if (DEBUG_INFO) {
@@ -553,16 +502,14 @@ int main(int argc, char** argv) {
 
 		scene.camera.updatePosition();
 		updateControls();
+		Console::Update();
 		Input::Update();
 
 		Renderer::GenShadowMaps(scene);
 
 		Renderer::FrameBegin(scene);
 		for (const auto& object : scene.objects) object->draw({});
-		MSDFText::DrawText("dev test", font, 0, g_config.renderRes.y - font->lineHeight * 48, 32, glm::vec4(1));
-		/* не ну вроде нормально вишло даже 😎🤙🏿
-		приготовить и гамму пофиксить
-		 */
+		Console::Draw();
 		Renderer::FrameEnd(effects);
 
 		// render imgui

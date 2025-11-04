@@ -1,6 +1,7 @@
 #include "model.hpp"
 
 #include "../util.hpp"
+#include "core/logger.hpp"
 
 namespace Render {
 	void Mesh::setup() {
@@ -122,13 +123,12 @@ namespace Render {
 				return mesh;
 			}
 		}
-		std::cerr << OUT_WARNING << "No mesh with name " << name << " in model " << name << std::endl;
+		Log::Warning("No mesh with name " + name + " in model " + this->name);
 		return nullptr;
 	}
 
 
 	Model::~Model() {
-		std::cout << OUT_WARNING << "Model " << name << " destructed" << std::endl;
 		meshes.clear();
 	}
 }

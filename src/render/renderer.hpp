@@ -31,12 +31,14 @@ namespace Renderer {
 
 	// draw scene to the FBO
 	void FrameBegin(Scene& scene);
-
 	// applying post fx and rendering to the screen FBO
 	void FrameEnd(Render::PostEffects effects);
 
 	// void UpdateShadowRes();
 	void UpdateRenderRes();
+
+	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h);
+	void DrawRectOnScreen(float x, float y, float w, float h, const glm::vec4& color);
 
 	void RenderClear();
 
@@ -50,8 +52,6 @@ namespace Renderer {
 	void UpdateUBOData(const glm::vec3& viewPos);
 
 	void Shutdown();
-
-	static Render::Shader postfxShader;
 
 	static uint32_t FBO, RBO;
 	static uint32_t UBOMatrices, UBOLights, UBOData;
