@@ -93,51 +93,22 @@ static Render::PostEffects effects{
 	.vignetteColor = glm::vec3(0)
 };
 
-static bool FLASHLIGHT = false;
-
-static std::array<float, 256> FPS = {0};
-static bool DEBUG_INFO = false;
+static bool g_isFlashlight = false;
+static char g_imguilog[256];
+static std::array<float, 256> g_fpsarray = {0};
+static bool g_isDebugInfo = false;
 
 void DrawDebugInfo() {
 	ImGui::Begin("Debug Info", 0, ImGuiWindowFlags_NoTitleBar);
 
-	const float largest_num = *(std::ranges::max_element(FPS));
-	const float avg_num = std::accumulate(FPS.begin(), FPS.end(), 0.0) / FPS.size();
+	const float largest_num = *(std::ranges::max_element(g_fpsarray));
+	const float avg_num = std::accumulate(g_fpsarray.begin(), g_fpsarray.end(), 0.0) / g_fpsarray.size();
 
-	ImGui::PlotLines(" ", FPS.data(), FPS.size(), 0, ("avg: " + std::to_string(avg_num)).c_str(), 0, largest_num + 200,
+	ImGui::PlotLines(" ", g_fpsarray.data(), g_fpsarray.size(), 0, ("avg: " + std::to_string(avg_num)).c_str(), 0,
+	                 largest_num + 200,
 	                 {300, 70});
 
 	ImGui::End(); // End general options
-}
-
-void DrawKeymap() {
-	ImGui::Begin("Input");
-
-	const int cols = 30; // how many bits per row
-	const float size = 10.0f; // button size in pixels
-
-	for (size_t i = 32; i < 350; ++i) {
-		ImGui::PushID(static_cast<int>(i));
-
-		bool state = Input::g_keydownmap[i];
-		ImVec4 color = state ? ImVec4(0.3f, 0.8f, 0.3f, 1.0f) : ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
-		ImGui::PushStyleColor(ImGuiCol_Button, color);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-
-		ImGui::Button(" ", ImVec2(size, size));
-
-		ImGui::PopStyleColor(3);
-		ImGui::PopID();
-
-		if ((i + 1) % cols != 0)
-			ImGui::SameLine();
-	}
-
-	ImGui::Separator();
-	ImGui::Text("Offset scroll y %f", Input::g_scrollYOffset);
-
-	ImGui::End();
 }
 
 void DrawOptions() {
@@ -156,10 +127,10 @@ void DrawOptions() {
 	if (ImGui::CollapsingHeader("Render Settings")) {
 		//ImGui::ColorEdit3("Void Color", &voidColor[0]);
 		ImGui::SliderFloat("gamma", &effects.gamma, 0, 10, "%.1f");
-		if (ImGui::InputInt2("Render Resolution", &g_config.renderRes[0])) {
+		if (ImGui::InputInt2("Render Resolution", &g_config.r_resolution[0])) {
 			Renderer::UpdateRenderRes();
 		}
-		ImGui::ColorPicker3("Fill color", &g_config.fillColor[0]);
+		ImGui::ColorPicker3("Fill color", &g_config.r_fillColor[0]);
 		// if (ImGui::InputInt("Shadow Resolution", &config.shadowRes)) {
 		// renderer->updateShadowRes();
 		// }
@@ -274,6 +245,10 @@ void DrawOptions() {
 		}
 	}
 
+	if (ImGui::InputText("Log::Info", g_imguilog, 256)) {
+		Log::Info(g_imguilog);
+	}
+
 	ImGui::End(); // End general options
 }
 
@@ -340,29 +315,31 @@ void InitIMGUI() {
 
 void SaveScreenshot(const char* filename) {
 	// Выделение памяти под пиксели (формат RGB)
-	std::vector<unsigned char> pixels(g_config.windowRes.x * g_config.windowRes.y * 3);
+	std::vector<unsigned char> pixels(g_config.sys_windowResolution.x * g_config.sys_windowResolution.y * 3);
 
 	// Настройка параметров чтения пикселей
 	glPixelStorei(GL_PACK_ALIGNMENT, 1); // Убираем выравнивание
 	glReadBuffer(GL_FRONT); // Читаем из переднего буфера (для двойной буферизации)
 
 	// Чтение пикселей из буфера
-	glReadPixels(0, 0, g_config.windowRes.x, g_config.windowRes.y, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+	glReadPixels(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y, GL_RGB, GL_UNSIGNED_BYTE,
+	             pixels.data());
 
 	// Переворот изображения по вертикали (OpenGL хранит пиксели снизу вверх)
 	std::vector<unsigned char> flippedPixels(pixels.size());
-	for (int y = 0; y < g_config.windowRes.y; ++y) {
-		for (int x = 0; x < g_config.windowRes.x; ++x) {
+	for (int y = 0; y < g_config.sys_windowResolution.y; ++y) {
+		for (int x = 0; x < g_config.sys_windowResolution.x; ++x) {
 			for (int c = 0; c < 3; ++c) {
-				flippedPixels[(g_config.windowRes.y - 1 - y) * g_config.windowRes.x * 3 + x * 3 + c] =
-					pixels[y * g_config.windowRes.x * 3 + x * 3 + c];
+				flippedPixels[(g_config.sys_windowResolution.y - 1 - y) * g_config.sys_windowResolution.x * 3 + x * 3 +
+						c] =
+					pixels[y * g_config.sys_windowResolution.x * 3 + x * 3 + c];
 			}
 		}
 	}
 
 	// Сохранение в PNG
-	stbi_write_png(filename, g_config.windowRes.x, g_config.windowRes.y, 3, flippedPixels.data(),
-	               g_config.windowRes.x * 3);
+	stbi_write_png(filename, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y, 3, flippedPixels.data(),
+	               g_config.sys_windowResolution.x * 3);
 	Log::Info("Screenshot saved as " + std::string(filename));
 }
 
@@ -372,13 +349,14 @@ void updateControls() {
 	} else if (Input::IsKeyPressed(GLFW_KEY_F11)) {
 		SaveScreenshot("frame.png");
 	} else if (Input::IsKeyPressed(GLFW_KEY_F12)) {
-		DEBUG_INFO = !DEBUG_INFO;
+		g_isDebugInfo = !g_isDebugInfo;
 	} else if (Input::IsKeyPressed(GLFW_KEY_F)) {
-		FLASHLIGHT = !FLASHLIGHT;
-		Log::Debug("Flashlight: " + std::string(FLASHLIGHT ? "on" : "off"));
-		scene.spotLight.enable = FLASHLIGHT;
+		g_isFlashlight = !g_isFlashlight;
+		Log::Debug("Flashlight: " + std::string(g_isFlashlight ? "on" : "off"));
+		scene.spotLight.enable = g_isFlashlight;
 	} else if (Input::IsKeyPressed(GLFW_KEY_P)) {
 		scene.pointLight.enable = !scene.pointLight.enable;
+		Log::Info(std::string(200, '#'));
 	}
 
 	if (Input::IsKeyPressed(GLFW_KEY_GRAVE_ACCENT)) Console::Toggle();
@@ -391,14 +369,14 @@ void updateControls() {
 
 	if (Input::g_resizedHeight || Input::g_resizedWidth) {
 		if (Input::g_resizedWidth == 0 && Input::g_resizedHeight == 0) return; // in case of minimizing
-		g_config.windowRes = {Input::g_resizedWidth, Input::g_resizedHeight};
-		g_config.renderRes = {Input::g_resizedWidth, Input::g_resizedHeight};
-		Renderer::UpdateRenderRes();
+		g_config.sys_windowResolution = {Input::g_resizedWidth, Input::g_resizedHeight};
+		// g_config.renderRes = {Input::g_resizedWidth, Input::g_resizedHeight};
+		// Renderer::UpdateRenderRes();
 		glViewport(0, 0, Input::g_resizedWidth, Input::g_resizedHeight);
 	}
 
 	scene.camera.mouseMoved(Input::GetMouseX(), Input::GetMouseY());
-	scene.camera.mouseScrolled(Input::GetScrollYOffset(), g_config.renderDistance);
+	if (!Console::IsVisible()) scene.camera.mouseScrolled(Input::GetScrollYOffset(), g_config.r_renderDistance);
 }
 
 void setupScene(bool props) {
@@ -431,7 +409,7 @@ void setupScene(bool props) {
 	// create floor
 
 	Render::MeshPtr floor = Util::CreatePlaneMesh(8, "floor_plane");
-	floor->transform.scale = glm::vec3(g_config.renderDistance);
+	floor->transform.scale = glm::vec3(g_config.r_renderDistance);
 	floor->material->shader = ResourceMgr::GetShaderByName("scene");
 	floor->castShadow = false;
 	scene.objects.push_back(floor);
@@ -460,15 +438,20 @@ void LoadAll() {
 
 int main(int argc, char** argv) {
 	g_config = {
-		.windowRes = {1280, 720},
-		.renderRes = {1920, 1080}, // 320, 240
-		.shadowRes = 2048,
-		// --- GRAPHICS ---
-		.renderDistance = 1000.f,
-		.vsync = true,
-		.fillColor = {0.3, 0.3, 0.3}
+		.sys_windowResolution = {1280, 720},
+
+		.r_resolution = {2560, 1440}, // 2x sampling
+		.r_shadowRes = 2048,
+		.r_renderDistance = 1000.f,
+		.r_vsync = true,
+		.r_fillColor = {0.3, 0.3, 0.3},
+
+		.con_fontScale = 32,
+		.con_maxVisibleLines = 20,
+		.con_backgroundColor = {0, 0, 0, 0.9},
 	};
 	Log::Init();
+	Log::SetSeverity(Logger::Severity::Debug);
 
 	Renderer::Init();
 	LoadAll();
@@ -480,21 +463,20 @@ int main(int argc, char** argv) {
 	// TODO make loading screen w/ progresbar
 	setupScene(true);
 
-
 	double lastTime = glfwGetTime();
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
 
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
-		if (DEBUG_INFO) {
+		if (g_isDebugInfo) {
 			frameCount++;
-			FPS[indexFPS] = frameCount / (glfwGetTime() - lastTime);
+			g_fpsarray[indexFPS] = frameCount / (glfwGetTime() - lastTime);
 			indexFPS++;
 			frameCount = 0;
 			lastTime = glfwGetTime();
 		}
 
-		if (FLASHLIGHT) {
+		if (g_isFlashlight) {
 			scene.spotLight.position = scene.camera.position;
 			scene.spotLight.position.y -= 2;
 			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
@@ -517,8 +499,7 @@ int main(int argc, char** argv) {
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 		DrawOptions();
-		DrawKeymap();
-		if (DEBUG_INFO) DrawDebugInfo();
+		if (g_isDebugInfo) DrawDebugInfo();
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

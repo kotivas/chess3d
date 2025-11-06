@@ -1,10 +1,11 @@
 #pragma once
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace Logger {
-	enum Severity : uint8_t {
-		Critical = 0,
+	enum class Severity : uint8_t {
+		Fatal = 0,
 		Error,
 		Warning,
 		Info,
@@ -19,12 +20,16 @@ namespace Logger {
 
 	class Logger final {
 	public:
+		Logger()
+			: _severity(Severity::Debug) {} // log everything
+
 		void addSink(ILogSink* sink);
 		void log(Severity sev, const std::string& msg) const;
-		int addSink(int _cpp_par_);
+		void setSeverity(Severity sev);
 
 	private:
 		std::vector<ILogSink*> _sinks;
+		Severity _severity;
 	};
 
 	class CoutSink final : ILogSink {
@@ -46,6 +51,7 @@ namespace Log {
 	void Info(const std::string& msg);
 	void Warning(const std::string& msg);
 	void Error(const std::string& msg);
-	void Critical(const std::string& msg);
+	void Fatal(const std::string& msg);
 	void Log(Logger::Severity sev, const std::string& msg);
+	void SetSeverity(Logger::Severity sev);
 }

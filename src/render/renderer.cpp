@@ -23,7 +23,7 @@ namespace Renderer {
 			glDebugMessageCallback(Util::glDebugOutput, nullptr);
 		}
 
-		glViewport(0, 0, g_config.windowRes.x, g_config.windowRes.y);
+		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
 
 		glEnable(GL_DEPTH_TEST);
 
@@ -32,13 +32,13 @@ namespace Renderer {
 		glFrontFace(GL_CCW); // Указываем порядок вершин для лицевых граней (CCW по умолчанию)
 
 		// work with shadows
-		spotShadow.resolution = g_config.shadowRes; // todo maybe i should split it
+		spotShadow.resolution = g_config.r_shadowRes; // todo maybe i should split it
 		spotShadow.generate();
 
-		dirShadow.resolution = g_config.shadowRes;
+		dirShadow.resolution = g_config.r_shadowRes;
 		dirShadow.generate();
 
-		pointShadow.resolution = g_config.shadowRes;
+		pointShadow.resolution = g_config.r_shadowRes;
 		pointShadow.generate();
 
 		CreateFrameBuffer();
@@ -57,10 +57,10 @@ namespace Renderer {
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 		//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-		g_window = glfwCreateWindow(g_config.windowRes.x, g_config.windowRes.y, "chess3d", nullptr, nullptr);
+		g_window = glfwCreateWindow(g_config.sys_windowResolution.x, g_config.sys_windowResolution.y, "chess3d", nullptr, nullptr);
 
 		glfwMakeContextCurrent(g_window);
-		glfwSwapInterval(g_config.vsync); // vsync 1 - on; 0 - off
+		glfwSwapInterval(g_config.r_vsync); // vsync 1 - on; 0 - off
 
 		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 	}
@@ -73,7 +73,7 @@ namespace Renderer {
 		glGenTextures(1, &textureColorBuffer);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
 		// glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, config.renderRes.x, config.renderRes.y, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.renderRes.x, g_config.renderRes.y, 0, GL_RGBA, GL_FLOAT,
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA, GL_FLOAT,
 		             NULL);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -83,7 +83,7 @@ namespace Renderer {
 		// create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
 		glGenRenderbuffers(1, &RBO);
 		glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.renderRes.x, g_config.renderRes.y);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.r_resolution.x, g_config.r_resolution.y);
 		// use a single renderbuffer object for both a depth AND stencil buffer.
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
 		// now actually attach it
@@ -155,7 +155,7 @@ namespace Renderer {
 		glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 
 		//glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-		glClearColor(g_config.fillColor.r, g_config.fillColor.g, g_config.fillColor.b, 1.0f);
+		glClearColor(g_config.r_fillColor.r, g_config.r_fillColor.g, g_config.r_fillColor.b, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -189,7 +189,7 @@ namespace Renderer {
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOData);
 
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(viewPos), glm::value_ptr(viewPos));
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec3), sizeof(float), &g_config.renderDistance);
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec3), sizeof(float), &g_config.r_renderDistance);
 
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
@@ -200,7 +200,7 @@ namespace Renderer {
 		// light space matrix for directional light
 
 		if (scene.dirLight.enable) {
-			dirShadow.calculateLightSpaceMatrix(scene.dirLight.direction, 0.1f, g_config.renderDistance);
+			dirShadow.calculateLightSpaceMatrix(scene.dirLight.direction, 0.1f, g_config.r_renderDistance);
 
 			// render scene from light's point of view
 			glViewport(0, 0, dirShadow.resolution, dirShadow.resolution);
@@ -217,7 +217,7 @@ namespace Renderer {
 		}
 		if (scene.spotLight.enable) {
 			spotShadow.calculateLightSpaceMatrix(scene.spotLight.position, scene.spotLight.direction,
-			                                     scene.spotLight.outerCutOff, 0.1f, g_config.renderDistance);
+			                                     scene.spotLight.outerCutOff, 0.1f, g_config.r_renderDistance);
 
 			// render scene from light's point of view
 			glViewport(0, 0, spotShadow.resolution, spotShadow.resolution);
@@ -233,7 +233,7 @@ namespace Renderer {
 			}
 		}
 		if (scene.pointLight.enable) {
-			pointShadow.genTransformMatrixes(scene.pointLight.position, 0.1f, g_config.renderDistance);
+			pointShadow.genTransformMatrixes(scene.pointLight.position, 0.1f, g_config.r_renderDistance);
 
 			// render scene from light's point of view
 			glViewport(0, 0, pointShadow.resolution, pointShadow.resolution);
@@ -256,7 +256,7 @@ namespace Renderer {
 			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
 				"shadowMatrices[5]", false, pointShadow.transforms[5]);
 
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform1f("far_plane", g_config.renderDistance);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform1f("far_plane", g_config.r_renderDistance);
 			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform3f("lightPos", scene.pointLight.position);
 
 			for (auto& object : scene.objects) {
@@ -269,7 +269,7 @@ namespace Renderer {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		// reset viewport
-		glViewport(0, 0, g_config.renderRes.x, g_config.renderRes.y);
+		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glCullFace(GL_BACK);
@@ -281,8 +281,8 @@ namespace Renderer {
 		UpdateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
 		UpdateUBOData(scene.camera.position);
 		UpdateUBOMatrices(
-			glm::perspective(glm::radians(scene.camera.fov), (float)g_config.windowRes.x / (float)g_config.windowRes.y,
-			                 0.1f, g_config.renderDistance), scene.camera.getViewMatrix(),
+			glm::perspective(glm::radians(scene.camera.fov), (float)g_config.sys_windowResolution.x / (float)g_config.sys_windowResolution.y,
+			                 0.1f, g_config.r_renderDistance), scene.camera.getViewMatrix(),
 			dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix
 		);
 
@@ -300,7 +300,7 @@ namespace Renderer {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
 
-		glViewport(0, 0, g_config.windowRes.x, g_config.windowRes.y);
+		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
 
 
 		Render::ShaderPtr postfxShader = ResourceMgr::GetShaderByName("postfx");
@@ -311,7 +311,7 @@ namespace Renderer {
 
 		postfxShader->setUniform1i("effects.quantization", effects.quantization);
 		postfxShader->setUniform1i("effects.quantizationLevel", effects.quantizationLevel);
-		postfxShader->setUniform2f("resolution", g_config.windowRes);
+		postfxShader->setUniform2f("resolution", g_config.sys_windowResolution);
 
 		postfxShader->setUniform1i("effects.vignette", effects.vignette);
 		postfxShader->setUniform1f("effects.vignetteIntensity", effects.vignetteIntensity);
@@ -355,7 +355,7 @@ namespace Renderer {
 
 		shader->setUniformMat4fv("uModel", false, model);
 
-		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.renderRes.x, (float)g_config.renderRes.y, 0.0f);
+		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.r_resolution.x, (float)g_config.r_resolution.y, 0.0f);
 
 		shader->setUniformMat4fv("uProjection", false, projection);
 
@@ -384,7 +384,7 @@ namespace Renderer {
 
 		shader->setUniformMat4fv("uModel", false, model);
 
-		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.renderRes.x, (float)g_config.renderRes.y, 0.0f);
+		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.r_resolution.x, (float)g_config.r_resolution.y, 0.0f);
 
 		shader->setUniformMat4fv("uProjection", false, projection);
 
@@ -411,10 +411,10 @@ namespace Renderer {
 
 	void UpdateRenderRes() {
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.renderRes.x, g_config.renderRes.y, 0, GL_RGBA, GL_FLOAT,
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA, GL_FLOAT,
 		             NULL);
 
 		glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.renderRes.x, g_config.renderRes.y);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.r_resolution.x, g_config.r_resolution.y);
 	}
 }

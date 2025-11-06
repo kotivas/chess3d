@@ -8,25 +8,28 @@
 #include "resourcemgr/resourcemgr.hpp"
 
 namespace Console {
+	int g_scrollOffset = 0;
+	bool g_isVisible = false;
 	std::vector<CMDMessage> g_messages;
-	int scrollOffset = 0;
-	bool g_isVisible = false;;
 
 	void Toggle() {
 		g_isVisible = !g_isVisible;
 	}
 
+	bool IsVisible() {
+		return g_isVisible;
+	}
+
 	void Init() {
-		Print(Info, "Console inited");
+		Print(SeverityLevel::Info, "Console inited");
 	}
 
 	void Update() {
 		if (Input::GetScrollYOffset()) {
-			scrollOffset += Input::GetScrollYOffset() < 0 ? -1 : 1;
+			g_scrollOffset += Input::GetScrollYOffset() < 0 ? -1 : 1;
 		}
 	}
 
-	// TODO REFACTOR THIS
 	void Draw() {
 		if (!g_isVisible) return;
 
@@ -36,56 +39,52 @@ namespace Console {
 			return;
 		}
 
-		Renderer::DrawRectOnScreen(0, 0, g_config.renderRes.x, MESSAGE_PER_PAGE * FONT_SCALE * font->lineHeight, {0, 0, 0, 1});
-		// maybe put all of this function insde of this namespace
+		const int& fontScale = g_config.con_fontScale;
+		const int& maxVisibleLines = g_config.con_maxVisibleLines;
 
+		const float lineOffset = font->lineHeight * fontScale;
+		const float lineyzero = g_config.r_resolution.y - 2 * font->ascender * fontScale;
+		const float maxHeight = maxVisibleLines * lineOffset;
+		const float maxWidth = g_config.r_resolution.x;
+		Renderer::DrawRectOnScreen(0, 0, maxWidth, maxHeight, g_config.con_backgroundColor);
+		Renderer::DrawRectOnScreen(0, maxHeight, maxWidth, 1, {1, 1, 0, 1});
 
-		const int totalLines = static_cast<int>(g_messages.size());
-		const int maxOffset = std::max(0, totalLines - MESSAGE_PER_PAGE);
-		scrollOffset = std::clamp(scrollOffset, 0, maxOffset);
-		int startIndex = totalLines - MESSAGE_PER_PAGE - scrollOffset;
-		for (int i = 0; i < MESSAGE_PER_PAGE; ++i) {
-			int idx = startIndex < 0 ? i : startIndex + i;
-			if (idx >= totalLines) break;
+		if (g_messages.empty()) return;
+		// STEP 1 --------------------------------- get visible messages vector
+		std::vector<CMDMessage> messages;
 
-			glm::vec3 msg_color;
-			std::string out_text;
-			switch (g_messages[idx].severity) {
-			case SeverityLevel::Critical:
-				msg_color = {0.47, 0, 0};
-				out_text = "[CRIT] " + g_messages[idx].text;
-				break;
-			case SeverityLevel::Error:
-				msg_color = {0.86, 0, 0};
-				out_text = "[ERROR] " + g_messages[idx].text;
-				break;
-			case SeverityLevel::Warning:
-				msg_color = {1, 0.54, 0};
-				out_text = "[WARN] " + g_messages[idx].text;
-				break;
-			case SeverityLevel::Info:
-				msg_color = {1, 1, 1};
-				out_text = "[INFO] " + g_messages[idx].text;
-				break;
-			case SeverityLevel::Debug:
-				msg_color = {1, 0.77, 0};
-				out_text = "[DEBUG] " + g_messages[idx].text;
-				break;
+		int total = static_cast<int>(g_messages.size());
+		int maxScroll = std::max(0, total - maxVisibleLines);
+		g_scrollOffset = std::clamp(g_scrollOffset, 0, maxScroll);
+
+		int end = total - g_scrollOffset; // newest msgs
+		int start = std::max(0, end - maxVisibleLines); // start
+
+		messages.assign(g_messages.begin() + start, g_messages.begin() + end);
+		// STEP 2 --------------------------------- parse line boxes
+		std::vector<std::string> line_boxes;
+
+		for (const auto& msg : messages) {
+			if (msg.text.length() > MSDFText::GetMaxCharactersForWidth(msg.text, font, fontScale, maxWidth) ||
+				std::ranges::count(msg.text, '\n') != 0) {
+				// todo multiple lines
+				int maxChar = MSDFText::GetMaxCharactersForWidth(msg.text, font, fontScale, maxWidth);
+				line_boxes.push_back(msg.text.substr(0, maxChar));
+				line_boxes.push_back(msg.text.substr(maxChar));
+			} else {
+				line_boxes.push_back(msg.text);
 			}
-
-			MSDFText::DrawText(out_text, font, 0,
-			                   g_config.renderRes.y - FONT_SCALE * 1.5 - font->lineHeight * i * FONT_SCALE,
-			                   FONT_SCALE, {msg_color, 1});
 		}
 
-		// int startIndex = std::max(0, int(g_messages.size()) - MESSAGE_PER_PAGE - scrollOffset);
-		// for (int i = scrollOffset; i < MESSAGE_PER_PAGE; ++i) {
-		// 	int idx = startIndex + i;
-		// 	if (idx >= g_messages.size()) break;
-		//
-		// 	MSDFText::DrawText(g_messages[idx].text, font, 0, screenyzero - font->lineHeight * i * FONT_SCALE,
-		// 	                   FONT_SCALE, {1, 1, 1, 1});
-		// }
+		if (line_boxes.size() > maxVisibleLines) {
+			line_boxes.erase(line_boxes.begin(), line_boxes.begin() + (line_boxes.size() - maxVisibleLines));
+		}
+
+		// STEP 3 --------------------------------- rendering text
+
+		for (int i = 0; i < line_boxes.size(); i++) {
+			MSDFText::DrawText(line_boxes[i], font, 0, lineyzero - i * lineOffset, fontScale, {1, 1, 1, 1});
+		}
 	}
 
 	void Print(SeverityLevel level, const std::string& message) {
@@ -93,6 +92,7 @@ namespace Console {
 	}
 
 	void Print(const CMDMessage& message) {
+		g_scrollOffset = 0;
 		g_messages.push_back(message);
 	}
 }

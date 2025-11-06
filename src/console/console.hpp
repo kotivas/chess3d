@@ -4,8 +4,8 @@
 #include <vector>
 
 namespace Console {
-	enum SeverityLevel : uint8_t {
-		Critical = 0,
+	enum class SeverityLevel : uint8_t {
+		Fatal = 0,
 		Error,
 		Warning,
 		Info,
@@ -15,21 +15,21 @@ namespace Console {
 	struct CMDMessage {
 		CMDMessage(const SeverityLevel sev, std::string text)
 			: severity(sev), text(std::move(text)) {}
+
 		// timestamp
 		SeverityLevel severity;
 		std::string text;
 	};
 
-	constexpr int MESSAGE_PER_PAGE = 20;
-	constexpr int FONT_SCALE = 20;
-
-	extern std::vector<CMDMessage> g_messages;
-	extern int scrollOffset;
+	extern int g_scrollOffset;
 	extern bool g_isVisible;
+	extern std::vector<CMDMessage> g_messages;
 
 	void Init();
 	void Update();
 	void Draw();
+
+	bool IsVisible();
 
 	void Toggle();
 
