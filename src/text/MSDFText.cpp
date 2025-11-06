@@ -23,14 +23,14 @@ namespace MSDFText {
 	}
 
 	int GetMaxCharactersForWidth(const std::string& text, const FontPtr& font, const float scale,
-	                                     const float maxWidth) {
+	                             const float maxWidth) {
 		float width = 0.f;
 		int maxCharacters = 0;
 
 		for (const char cc : text) {
 			// if (cc == '\n') maxCharacters = 0; // new line
 			width += font->getGlyph(cc).advance * scale;
-			if ( width > maxWidth ) break;
+			if (width > maxWidth) break;
 			maxCharacters++;
 		}
 
@@ -74,11 +74,11 @@ namespace MSDFText {
 		float penY = y + font->ascender * scale; // baseline offset (≈ ascender)
 
 		for (const char cc : text) {
-			if (cc == '\n') {
-				penX = x;
-				penY -= font->lineHeight * scale;
-				continue;
-			}
+			// if (cc == '\n') {
+			// 	penX = x;
+			// 	penY -= font->lineHeight * scale;
+			// 	continue;
+			// }
 
 			const Glyph& g = font->getGlyph(cc);
 

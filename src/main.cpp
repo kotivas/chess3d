@@ -467,6 +467,8 @@ int main(int argc, char** argv) {
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
 
+	Log::Debug("test\nnew line");
+
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		if (g_isDebugInfo) {
 			frameCount++;

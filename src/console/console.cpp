@@ -65,12 +65,15 @@ namespace Console {
 		std::vector<std::string> line_boxes;
 
 		for (const auto& msg : messages) {
-			if (msg.text.length() > MSDFText::GetMaxCharactersForWidth(msg.text, font, fontScale, maxWidth) ||
-				std::ranges::count(msg.text, '\n') != 0) {
+			const int maxChar = MSDFText::GetMaxCharactersForWidth(msg.text, font, fontScale, maxWidth);
+
+			if (msg.text.length() > maxChar) {
 				// todo multiple lines
-				int maxChar = MSDFText::GetMaxCharactersForWidth(msg.text, font, fontScale, maxWidth);
 				line_boxes.push_back(msg.text.substr(0, maxChar));
 				line_boxes.push_back(msg.text.substr(maxChar));
+			} else if (msg.text.find('\n') != std::string::npos) {
+				line_boxes.push_back(msg.text.substr(0, msg.text.find('\n')));
+				line_boxes.push_back(msg.text.substr(msg.text.find('\n')+1));
 			} else {
 				line_boxes.push_back(msg.text);
 			}
@@ -82,7 +85,9 @@ namespace Console {
 
 		// STEP 3 --------------------------------- rendering text
 
-		for (int i = 0; i < line_boxes.size(); i++) {
+		for (int i = 0; i < line_boxes.size(); i
+		     ++
+		) {
 			MSDFText::DrawText(line_boxes[i], font, 0, lineyzero - i * lineOffset, fontScale, {1, 1, 1, 1});
 		}
 	}
