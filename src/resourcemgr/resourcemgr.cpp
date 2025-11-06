@@ -2,7 +2,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-#include "../util.hpp"
+#include "../com/util.hpp"
 #include <glad/glad.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>

@@ -2,28 +2,22 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "com/color.hpp"
+#include "core/logger.hpp"
 
 namespace Console {
-	enum class SeverityLevel : uint8_t {
-		Fatal = 0,
-		Error,
-		Warning,
-		Info,
-		Debug
-	};
+	struct CMDLine {
+		CMDLine(const Color::rgb_t color, const std::string& text)
+			: color(color), text(text) {}
 
-	struct CMDMessage {
-		CMDMessage(const SeverityLevel sev, std::string text)
-			: severity(sev), text(std::move(text)) {}
-
-		// timestamp
-		SeverityLevel severity;
+		Color::rgb_t color;
 		std::string text;
 	};
 
 	extern int g_scrollOffset;
 	extern bool g_isVisible;
-	extern std::vector<CMDMessage> g_messages;
+	extern std::vector<CMDLine> g_messages;
+	extern std::string g_inputField;
 
 	void Init();
 	void Update();
@@ -33,6 +27,7 @@ namespace Console {
 
 	void Toggle();
 
-	void Print(SeverityLevel level, const std::string& message);
-	void Print(const CMDMessage& message);
+	void Print(const Color::rgb_t& color, const std::string& message);
+	void Print(Logger::Severity sev, const std::string& message);
+	void Print(const CMDLine& message);
 }

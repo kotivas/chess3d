@@ -1,5 +1,5 @@
 #include "shader.hpp"
-#include "../util.hpp"
+#include "../com/util.hpp"
 #include <iostream>
 
 namespace Render {

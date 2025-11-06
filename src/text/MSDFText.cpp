@@ -1,6 +1,6 @@
 #include "MSDFText.hpp"
 #include "resourcemgr/resourcemgr.hpp"
-#include "game/config.hpp"
+#include "../com/config.hpp"
 
 namespace MSDFText {
 	GLuint vao = 0, vbo = 0;
@@ -60,7 +60,7 @@ namespace MSDFText {
 	}
 
 	void DrawText(const std::string& text, const FontPtr& font, const float x, const float y, const float scale,
-	              const glm::vec4 color) {
+	              const Color::rgba_t& color) {
 		struct Vtx {
 			float x, y, u, v;
 		};
@@ -71,7 +71,7 @@ namespace MSDFText {
 		verts.reserve(text.size() * 6);
 
 		float penX = x;
-		float penY = y + font->ascender * scale; // baseline offset (≈ ascender)
+		float penY = y; // baseline offset (≈ ascender)
 
 		for (const char cc : text) {
 			// if (cc == '\n') {

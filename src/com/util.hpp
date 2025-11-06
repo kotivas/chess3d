@@ -2,8 +2,8 @@
 
 #include <string>
 #include <fstream>
-#include "./render/model.hpp"
-#include "resourcemgr/resourcemgr.hpp"
+#include "../render/model.hpp"
+#include "../resourcemgr/resourcemgr.hpp"
 
 namespace Util {
 	const std::string readFromFile(const std::string& path);

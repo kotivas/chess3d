@@ -1,6 +1,6 @@
 #include "resourcemgr.hpp"
 
-#include "../util.hpp"
+#include "../com/util.hpp"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <rapidjson/document.h>

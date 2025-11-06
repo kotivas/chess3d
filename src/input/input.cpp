@@ -1,6 +1,8 @@
 #include "input.hpp"
 #include <GLFW/glfw3.h>
 
+#include "console/console.hpp"
+
 
 namespace Input {
 	double g_mouseX = 0.0;
@@ -11,6 +13,7 @@ namespace Input {
 	bool g_middleMouseDown = false;
 	int g_resizedWidth = 0;
 	int g_resizedHeight = 0;
+	std::string g_textBuffer;
 
 	std::bitset<350> g_keydownmap;
 	std::bitset<350> g_keypressedmap;
@@ -18,10 +21,15 @@ namespace Input {
 	void Init() {
 		glfwSetScrollCallback(Renderer::g_window, ScrollCallback);
 		glfwSetFramebufferSizeCallback(Renderer::g_window, ResizeCallback);
+		glfwSetCharCallback(Renderer::g_window, CharCallback);
 	}
 
 	void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 		g_scrollYOffset = yoffset;
+	}
+
+	void CharCallback(GLFWwindow* window, unsigned int codepoint) {
+		g_textBuffer += static_cast<char>(codepoint);
 	}
 
 	void ResizeCallback(GLFWwindow* window, int width, int height) {
@@ -29,10 +37,11 @@ namespace Input {
 		g_resizedHeight = height;
 	}
 
-	void Update() {
+	void PollEvents() {
 		g_scrollYOffset = 0;
 		g_resizedWidth = 0;
 		g_resizedHeight = 0;
+		g_textBuffer.clear();
 
 		// Keyboard
 		for (int i = 32; i < 349; i++) {
@@ -55,6 +64,10 @@ namespace Input {
 		g_leftMouseDown = glfwGetMouseButton(Renderer::g_window, GLFW_MOUSE_BUTTON_LEFT);
 		g_rightMouseDown = glfwGetMouseButton(Renderer::g_window, GLFW_MOUSE_BUTTON_RIGHT);
 		g_middleMouseDown = glfwGetMouseButton(Renderer::g_window, GLFW_MOUSE_BUTTON_MIDDLE);
+	}
+
+	std::string& GetTextBuffer() {
+		return g_textBuffer;
 	}
 
 	bool IsKeyDown(uint16_t key) {

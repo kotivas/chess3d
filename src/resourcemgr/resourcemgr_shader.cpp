@@ -1,7 +1,7 @@
 #include "resourcemgr.hpp"
 #include "./render/shader.hpp"
 #include "core/logger.hpp"
-#include "./util.hpp"
+#include "../com/util.hpp"
 
 namespace ResourceMgr {
 	GLuint compileShader(GLenum shaderType, const std::string& src) {

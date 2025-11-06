@@ -3,7 +3,7 @@
 #include <array>
 #include <string>
 
-#include "game/config.hpp"
+#include "com/config.hpp"
 #include "resourcemgr/resourcemgr.hpp"
 #include "game/scene.hpp"
 #include "render/model.hpp"
@@ -20,7 +20,7 @@
 #include "./input/input.hpp"
 
 #include "stb_image_write.h"
-#include "util.hpp"
+#include "com/util.hpp"
 #include "./text/MSDFText.hpp"
 #include "console/console.hpp"
 #include "core/logger.hpp"
@@ -467,8 +467,6 @@ int main(int argc, char** argv) {
 	int frameCount = 0;
 	uint8_t indexFPS = 0;
 
-	Log::Debug("test\nnew line");
-
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		if (g_isDebugInfo) {
 			frameCount++;
@@ -487,7 +485,8 @@ int main(int argc, char** argv) {
 		scene.camera.updatePosition();
 		updateControls();
 		Console::Update();
-		Input::Update();
+
+		Input::PollEvents(); // always should be updated last
 
 		Renderer::GenShadowMaps(scene);
 

@@ -26,22 +26,16 @@ set(SOURCE
 		src/render/model.cpp
 		src/game/game.cpp
  		src/resourcemgr/resourcemgr.cpp
-		src/util.cpp
+		src/com/util.cpp
 		src/render/shadow.cpp
-		src/render/shadow.hpp
-		src/game/config.cpp
+		src/com/config.cpp
 		src/input/input.cpp
-		src/input/input.hpp
 		src/console/console.cpp
-		src/console/console.hpp
-		src/console/cmdsystem.cpp
-		src/console/cmdsystem.hpp
 		src/text/MSDFText.cpp
-		src/text/MSDFText.hpp
 		src/resourcemgr/resourcemgr_model.cpp
 		src/resourcemgr/resourcemgr_shader.cpp
 		src/core/logger.cpp
-		src/core/logger.hpp)
+)
 
 add_executable(chess3d ${SOURCE} )
 add_custom_command(

@@ -1,6 +1,6 @@
 #include "util.hpp"
 
-#include "core/logger.hpp"
+#include "../core/logger.hpp"
 
 namespace Util {
 	void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length,

@@ -6,6 +6,8 @@
 #include <memory>
 #include <glm/vec3.hpp>
 
+#include "com/color.hpp"
+
 namespace MSDFText {
 
 	constexpr char GLYPH_PLACEHOLDER = 0x63; // character [?]: if there is no glyph corresponding to the character
@@ -34,12 +36,12 @@ namespace MSDFText {
 		std::string string;
 		float scale;
 		glm::vec3 position;
-		glm::vec4 color;
+		Color::rgba_t color;
 		FontPtr font;
 	};
 
 	void Init();
-	void DrawText(const std::string& text, const FontPtr& font, float x, float y, float scale, glm::vec4 color);
+	void DrawText(const std::string& text, const FontPtr& font, float x, float y, float scale, const Color::rgba_t& color);
 	void DrawText(const Text& text);
 
 	float CalcTextWidth(const std::string& text, const FontPtr& font, float scale);

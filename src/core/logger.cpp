@@ -1,7 +1,6 @@
 #include "core/logger.hpp"
 
 #include <iostream>
-
 #include "console/console.hpp"
 
 namespace Logger {
@@ -38,11 +37,14 @@ namespace Logger {
 		case Severity::Debug:
 			std::cout << "[DEBUG] " << msg << std::endl;
 			break;
+		case Severity::None:
+			std::cout << msg << std::endl;
+			break;
 		}
 	}
 
 	void ConsoleSink::write(Severity sev, const std::string& msg) {
-		Console::Print(static_cast<Console::SeverityLevel>(sev), msg);
+		Console::Print(sev, msg);
 	}
 }
 

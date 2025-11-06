@@ -1,7 +1,7 @@
 #include "renderer.hpp"
 
-#include "util.hpp"
-#include "../game/config.hpp"
+#include "../com/util.hpp"
+#include "../com/config.hpp"
 #include "resourcemgr/resourcemgr.hpp"
 
 namespace Renderer {

@@ -1,11 +1,11 @@
 #pragma once
-#include <memory>
 #include <string>
 #include <vector>
 
 namespace Logger {
 	enum class Severity : uint8_t {
-		Fatal = 0,
+		None = 0,
+		Fatal,
 		Error,
 		Warning,
 		Info,

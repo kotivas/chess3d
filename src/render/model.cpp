@@ -1,6 +1,6 @@
 #include "model.hpp"
 
-#include "../util.hpp"
+#include "../com/util.hpp"
 #include "core/logger.hpp"
 
 namespace Render {
