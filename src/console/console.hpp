@@ -27,6 +27,8 @@ namespace Console {
 
 	void Toggle();
 
+	void ExecuteCommand(const std::string& command);
+
 	void Print(const Color::rgb_t& color, const std::string& message);
 	void Print(Logger::Severity sev, const std::string& message);
 	void Print(const CMDLine& message);

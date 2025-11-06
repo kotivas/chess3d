@@ -23,6 +23,7 @@
 #include "com/util.hpp"
 #include "./text/MSDFText.hpp"
 #include "console/console.hpp"
+#include "core/cvar.hpp"
 #include "core/logger.hpp"
 
 // TODO make it json or smth
@@ -83,8 +84,6 @@ static Scene scene{
 	}
 };
 static Render::PostEffects effects{
-	.gamma = 2.2,
-
 	.quantization = false,
 	.quantizationLevel = 4,
 
@@ -126,7 +125,7 @@ void DrawOptions() {
 
 	if (ImGui::CollapsingHeader("Render Settings")) {
 		//ImGui::ColorEdit3("Void Color", &voidColor[0]);
-		ImGui::SliderFloat("gamma", &effects.gamma, 0, 10, "%.1f");
+		ImGui::SliderFloat("gamma", &g_config.r_gamma, 0, 10, "%.1f");
 		if (ImGui::InputInt2("Render Resolution", &g_config.r_resolution[0])) {
 			Renderer::UpdateRenderRes();
 		}
@@ -350,13 +349,12 @@ void updateControls() {
 		SaveScreenshot("frame.png");
 	} else if (Input::IsKeyPressed(GLFW_KEY_F12)) {
 		g_isDebugInfo = !g_isDebugInfo;
-	} else if (Input::IsKeyPressed(GLFW_KEY_F)) {
+	} else if (Input::IsKeyPressed(GLFW_KEY_F) && !Console::IsVisible()) {
 		g_isFlashlight = !g_isFlashlight;
 		Log::Debug("Flashlight: " + std::string(g_isFlashlight ? "on" : "off"));
 		scene.spotLight.enable = g_isFlashlight;
-	} else if (Input::IsKeyPressed(GLFW_KEY_P)) {
+	} else if (Input::IsKeyPressed(GLFW_KEY_P) && !Console::IsVisible()) {
 		scene.pointLight.enable = !scene.pointLight.enable;
-		Log::Info(std::string(200, '#'));
 	}
 
 	if (Input::IsKeyPressed(GLFW_KEY_GRAVE_ACCENT)) Console::Toggle();
@@ -436,10 +434,68 @@ void LoadAll() {
 	ResourceMgr::LoadModel("desk", "assets/models/desk.obj", ResourceMgr::GetShaderByName("scene"));
 }
 
+void RegisterCVars() {
+	CVarSys::Register("r_gamma", "Adjusts screen gamma correction", 2.2, [](float val) { g_config.r_gamma = val; }, 0.f,
+	                  4.f, 2.2f);
+	CVarSys::Register("r_shadowRes", "Shadow map resolution", 2048.f,
+	                  [](float val) { g_config.r_shadowRes = static_cast<int>(val); }, 512.f, 8192.f, 2048.f);
+
+	CVarSys::Register("r_renderDistance", "Maximum render distance", 1000.f,
+	                  [](float val) { g_config.r_renderDistance = val; }, 100.f, 5000.f, 1000.f);
+
+	CVarSys::Register("r_vsync", "Vertical synchronization (1 = on, 0 = off)", g_config.r_vsync ? 1.f : 0.f,
+	                  [](float val) { g_config.r_vsync = val > 0.5f; }, 0.f, 1.f, 1.f);
+
+	CVarSys::Register("r_fillColor_r", "Background fill color (red)", g_config.r_fillColor.r,
+	                  [](float val) { g_config.r_fillColor.r = val; }, 0.f, 1.f, 0.3f);
+	CVarSys::Register("r_fillColor_g", "Background fill color (green)", g_config.r_fillColor.g,
+	                  [](float val) { g_config.r_fillColor.g = val; }, 0.f, 1.f, 0.3f);
+	CVarSys::Register("r_fillColor_b", "Background fill color (blue)", g_config.r_fillColor.b,
+	                  [](float val) { g_config.r_fillColor.b = val; }, 0.f, 1.f, 0.3f);
+
+	// --- Console ---
+	CVarSys::Register("con_fontScale", "Console font size scale", 32.f,
+	                  [](float val) { g_config.con_fontScale = val; }, 8.f, 128.f, 32.f);
+
+	CVarSys::Register("con_maxVisibleLines", "Maximum visible console lines", 20.f,
+	                  [](float val) { g_config.con_maxVisibleLines = static_cast<int>(val); }, 5.f, 100.f, 20.f);
+
+	CVarSys::Register("con_backgroundColor_r", "Console background color (red)", g_config.con_backgroundColor.r,
+	                  [](float val) { g_config.con_backgroundColor.r = val; }, 0.f, 1.f, 0.f);
+	CVarSys::Register("con_backgroundColor_g", "Console background color (green)", g_config.con_backgroundColor.g,
+	                  [](float val) { g_config.con_backgroundColor.g = val; }, 0.f, 1.f, 0.f);
+	CVarSys::Register("con_backgroundColor_b", "Console background color (blue)", g_config.con_backgroundColor.b,
+	                  [](float val) { g_config.con_backgroundColor.b = val; }, 0.f, 1.f, 0.f);
+	CVarSys::Register("con_backgroundColor_a", "Console background alpha", g_config.con_backgroundColor.a,
+	                  [](float val) { g_config.con_backgroundColor.a = val; }, 0.f, 1.f, 0.9f);
+
+	// --- Post-processing / Effects ---
+	CVarSys::Register("fx_quantization", "Enable color quantization (1 = on, 0 = off)",
+	                  effects.quantization ? 1.f : 0.f,
+	                  [](float val) { effects.quantization = val > 0.5f; }, 0.f, 1.f, 0.f);
+
+	CVarSys::Register("fx_quantizationLevel", "Color quantization level", effects.quantizationLevel,
+	                  [](float val) { effects.quantizationLevel = static_cast<int>(val); }, 2.f, 16.f, 4.f);
+
+	CVarSys::Register("fx_vignette", "Enable vignette effect (1 = on, 0 = off)", effects.vignette ? 1.f : 0.f,
+	                  [](float val) { effects.vignette = val > 0.5f; }, 0.f, 1.f, 1.f);
+
+	CVarSys::Register("fx_vignetteIntensity", "Vignette intensity", effects.vignetteIntensity,
+	                  [](float val) { effects.vignetteIntensity = val; }, 0.f, 1.f, 0.25f);
+
+	CVarSys::Register("fx_vignetteColor_r", "Vignette color (red)", effects.vignetteColor.r,
+	                  [](float val) { effects.vignetteColor.r = val; }, 0.f, 1.f, 0.f);
+	CVarSys::Register("fx_vignetteColor_g", "Vignette color (green)", effects.vignetteColor.g,
+	                  [](float val) { effects.vignetteColor.g = val; }, 0.f, 1.f, 0.f);
+	CVarSys::Register("fx_vignetteColor_b", "Vignette color (blue)", effects.vignetteColor.b,
+	                  [](float val) { effects.vignetteColor.b = val; }, 0.f, 1.f, 0.f);
+}
+
 int main(int argc, char** argv) {
 	g_config = {
 		.sys_windowResolution = {1280, 720},
 
+		.r_gamma = 2.2,
 		.r_resolution = {2560, 1440}, // 2x sampling
 		.r_shadowRes = 2048,
 		.r_renderDistance = 1000.f,
@@ -459,6 +515,8 @@ int main(int argc, char** argv) {
 	Console::Init();
 	InitIMGUI();
 	MSDFText::Init();
+
+	RegisterCVars();
 
 	// TODO make loading screen w/ progresbar
 	setupScene(true);

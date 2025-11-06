@@ -11,8 +11,6 @@
 
 namespace Render {
 	struct PostEffects {
-		float gamma;
-
 		bool quantization;
 		int quantizationLevel;
 

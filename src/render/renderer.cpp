@@ -307,7 +307,7 @@ namespace Renderer {
 
 		postfxShader->use();
 
-		postfxShader->setUniform1f("effects.gamma", effects.gamma);
+		postfxShader->setUniform1f("effects.gamma", g_config.r_gamma);
 
 		postfxShader->setUniform1i("effects.quantization", effects.quantization);
 		postfxShader->setUniform1i("effects.quantizationLevel", effects.quantizationLevel);

@@ -35,6 +35,7 @@ set(SOURCE
 		src/resourcemgr/resourcemgr_model.cpp
 		src/resourcemgr/resourcemgr_shader.cpp
 		src/core/logger.cpp
+		src/core/cvar.cpp
 )
 
 add_executable(chess3d ${SOURCE} )

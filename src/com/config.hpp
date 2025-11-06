@@ -8,6 +8,7 @@ struct Config {
 	glm::ivec2 sys_windowResolution;
 
 	// --- RENDER ---
+	float r_gamma;
 	glm::ivec2 r_resolution;
 	uint16_t r_shadowRes;
 	float r_renderDistance;

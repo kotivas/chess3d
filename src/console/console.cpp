@@ -1,11 +1,15 @@
 #include "console.hpp"
 
-#include "../com/config.hpp"
+#include <format>
+#include <sstream>
+
+#include "com/config.hpp"
+#include "core/cvar.hpp"
+#include "core/logger.hpp"
 #include "input/input.hpp"
 #include "render/renderer.hpp"
-#include "core/logger.hpp"
-#include "text/MSDFText.hpp"
 #include "resourcemgr/resourcemgr.hpp"
+#include "text/MSDFText.hpp"
 
 namespace Console {
 	int g_scrollOffset = 0;
@@ -24,6 +28,61 @@ namespace Console {
 	void Init() {
 		// Print("Console inited");
 	}
+
+	void ExecuteCommand(const std::string& command) {
+		if (command.empty())
+			return;
+
+		std::istringstream iss(command);
+		std::string name, value_str;
+
+		Print(Color::WHITE, "> " + command);
+
+		// Parse command name and optional value
+		if (!(iss >> name)) {
+			Log::Error("invalid command syntax");
+			return;
+		}
+
+		// Handle built-in commands
+		if (name == "clear") {
+			g_messages.clear();
+			return;
+		}
+		if (name == "help") {
+			for (const auto& cvar : CVarSys::g_cvars) {
+				Print(Color::WHITE, cvar.name + ": " + cvar.desc);
+			}
+			return;
+		}
+
+		auto* cvar = CVarSys::Find(name);
+		if (!cvar) {
+			Log::Warning("Unknown command <" + name + ">");
+			return;
+		}
+
+		// Try to read a value, if any
+		if (!(iss >> value_str)) {
+			Print(Color::WHITE,
+			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name, cvar->val, cvar->desc,
+			                  cvar->defVal, cvar->min, cvar->max));
+			return;
+		}
+
+		// Try converting to float
+		float value;
+		try {
+			value = std::stof(value_str);
+		} catch (const std::exception& e) {
+			Print(Color::LIGHT_RED, "Invalid argument");
+			return;
+		}
+
+		// Execute
+		cvar->set(value);
+	}
+
 
 	void Update() {
 		if (!g_isVisible) return;
@@ -45,7 +104,8 @@ namespace Console {
 			}
 
 			if (Input::IsKeyPressed(GLFW_KEY_ENTER)) {
-				g_messages.push_back({Color::WHITE, g_inputField});
+				// g_messages.push_back({Color::WHITE, g_inputField});
+				ExecuteCommand(g_inputField);
 				g_inputField.clear();
 			}
 		}
