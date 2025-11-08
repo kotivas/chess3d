@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <utility>
 #include <vector>
 #include "com/color.hpp"
 #include "core/logger.hpp"

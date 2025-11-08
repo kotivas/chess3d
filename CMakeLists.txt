@@ -7,7 +7,6 @@ find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glad REQUIRED)
 find_package(glm REQUIRED)
-find_package(imgui REQUIRED)
 find_package(Stb REQUIRED)
 find_package(assimp REQUIRED)
 find_package(rapidjson REQUIRED)
@@ -35,7 +34,9 @@ set(SOURCE
 		src/resourcemgr/resourcemgr_model.cpp
 		src/resourcemgr/resourcemgr_shader.cpp
 		src/core/logger.cpp
-		src/core/cvar.cpp
+		src/core/cmdsystem.cpp
+		src/core/cmdsystem.hpp
+		src/core/cvar.hpp
 )
 
 add_executable(chess3d ${SOURCE} )
@@ -52,5 +53,5 @@ add_custom_command(
 	"${CMAKE_BINARY_DIR}/shaders" )
 
 target_include_directories(chess3d PRIVATE ${Stb_INCLUDE_DIR})
-target_link_libraries(chess3d PRIVATE OpenGL::GL glad::glad glfw glm::glm imgui::imgui assimp::assimp rapidjson)
+target_link_libraries(chess3d PRIVATE OpenGL::GL glad::glad glfw glm::glm assimp::assimp rapidjson)
 

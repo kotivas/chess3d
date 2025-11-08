@@ -64,6 +64,8 @@ namespace Input {
 		g_leftMouseDown = glfwGetMouseButton(Renderer::g_window, GLFW_MOUSE_BUTTON_LEFT);
 		g_rightMouseDown = glfwGetMouseButton(Renderer::g_window, GLFW_MOUSE_BUTTON_RIGHT);
 		g_middleMouseDown = glfwGetMouseButton(Renderer::g_window, GLFW_MOUSE_BUTTON_MIDDLE);
+
+		glfwPollEvents();
 	}
 
 	std::string& GetTextBuffer() {

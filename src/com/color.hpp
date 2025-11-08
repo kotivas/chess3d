@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 
 
 // normalized color values for gpu
@@ -9,6 +10,17 @@ namespace Color {
 		float r;
 		float g;
 		float b;
+
+		ColorRGB& operator=(const std::array<float, 3>& arr) {
+			r = arr[0];
+			g = arr[1];
+			b = arr[2];
+			return *this;
+		}
+
+		explicit operator std::array<float, 3>() const {
+			return {r, g, b};
+		}
 	} typedef rgb_t;
 
 	struct ColorRGBA {
@@ -19,13 +31,28 @@ namespace Color {
 		float g;
 		float b;
 		float a;
+
+		ColorRGBA& operator=(const std::array<float, 4>& arr) {
+			r = arr[0];
+			g = arr[1];
+			b = arr[2];
+			a = arr[3];
+			return *this;
+		}
+
+		explicit operator std::array<float, 4>() const {
+			return {r, g, b, a};
+		}
 	} typedef rgba_t;
 
 	using hex_t = uint32_t; // 0xAABBFF
 
 	inline rgb_t Normalize(uint8_t r, uint8_t g, uint8_t b) { return {r / 255.f, g / 255.f, b / 255.f}; }
-	inline rgba_t Normalize(uint8_t r, uint8_t g, uint8_t b, uint8_t a) { return {r / 255.f, g / 255.f, b/255.f, a/255.f}; }
-	
+
+	inline rgba_t Normalize(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+		return {r / 255.f, g / 255.f, b / 255.f, a / 255.f};
+	}
+
 	constexpr rgb_t BLACK{0.0f, 0.0f, 0.0f};
 	constexpr rgb_t WHITE{1.0f, 1.0f, 1.0f};
 	constexpr rgb_t RED{1.0f, 0.0f, 0.0f};

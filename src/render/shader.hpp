@@ -12,13 +12,13 @@
 
 #include <memory>
 
+#include "com/color.hpp"
+
 namespace Render {
 	struct Shader {
 		Shader();
 
 		void use();
-
-		// TODO isLoaded
 
 		GLuint getID() const;
 
@@ -26,15 +26,15 @@ namespace Render {
 		void setUniform2i(const std::string& name, int v0, int v1) const;
 		void setUniform3i(const std::string& name, int v0, int v1, int v2) const;
 		void setUniform4i(const std::string& name, int v0, int v1, int v2, int v3) const;
-
 		void setUniform1f(const std::string& name, float v0) const;
 		void setUniform2f(const std::string& name, float v0, float v1) const;
 		void setUniform2f(const std::string& name, glm::vec2 v) const;
 		void setUniform3f(const std::string& name, float v0, float v1, float v2) const;
 		void setUniform3f(const std::string& name, glm::vec3 v) const;
+		void setUniform3f(const std::string& name, const Color::rgb_t& c);
 		void setUniform4f(const std::string& name, float v0, float v1, float v2, float v3) const;
 		void setUniform4f(const std::string& name, glm::vec4 v) const;
-
+		void setUniform4f(const std::string& name, const Color::rgba_t& c) const;
 		void setUniformMat4fv(const std::string& name, GLboolean transpose, glm::mat4& value) const;
 
 

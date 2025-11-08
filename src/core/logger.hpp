@@ -4,8 +4,7 @@
 
 namespace Logger {
 	enum class Severity : uint8_t {
-		None = 0,
-		Fatal,
+		Fatal = 0,
 		Error,
 		Warning,
 		Info,

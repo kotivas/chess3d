@@ -150,8 +150,10 @@ namespace ResourceMgr {
 			font->glyphs[glyph.codepoint] = glyph;
 		}
 
-		Log::Info("[MSDF] Loaded font: " + std::to_string(font->glyphs.size()) + " glyphs (" + std::to_string(w) + "x" +
-		          std::to_string(h) + " atlas)");
+		Log::Debug(
+			"MSDF Font loaded: " + pngPath + " (" + std::to_string(font->glyphs.size()) + " glyphs " +
+			std::to_string(w) + "x" +
+			std::to_string(h) + " atlas)");
 
 		// return font;
 		g_fonts.insert({name, font});

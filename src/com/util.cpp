@@ -1,13 +1,91 @@
 #include "util.hpp"
-
 #include "../core/logger.hpp"
+#include <fstream>
+#include <ranges>
+#include <sstream>
 
 namespace Util {
+	std::string trim(const std::string& s) {
+		const auto start = std::find_if_not(s.begin(), s.end(), ::isspace);
+		const auto end = std::find_if_not(s.rbegin(), s.rend(), ::isspace).base();
+		return (start < end ? std::string(start, end) : std::string());
+	}
+
+	template <typename T>
+	std::optional<T> TryParse(const std::string& str) {
+		Log::Warning("Util::TryParse<T>: no parser defined for this type");
+		return std::nullopt;
+	}
+
+	template <>
+	std::optional<int> TryParse<int>(const std::string& str) {
+		try {
+			return std::stoi(trim(str));
+		} catch (...) { return std::nullopt; }
+	}
+
+	template <>
+	std::optional<float> TryParse<float>(const std::string& str) {
+		try {
+			return std::stof(trim(str));
+		} catch (...) { return std::nullopt; }
+	}
+
+	template <>
+	std::optional<bool> TryParse<bool>(const std::string& str) {
+		const std::string trimstr = trim(str);
+		if (trimstr == "true" || trimstr == "1") return true;
+		if (trimstr == "false" || trimstr == "0") return false;
+		return std::nullopt;
+	}
+
+	template <>
+	std::optional<std::string> TryParse<std::string>(const std::string& str) {
+		return str;
+	}
+
+	std::vector<float> ParseFloatList(const std::string& str) {
+		std::vector<float> vals;
+		std::string clean;
+		clean.reserve(str.size());
+		for (char c : str)
+			clean += (c == ',' ? ' ' : c);
+
+		std::istringstream ss(clean);
+		float v;
+		while (ss >> v)
+			vals.push_back(v);
+
+		return vals;
+	}
+
+	// new parsers
+	template <>
+	std::optional<std::array<float, 2>> TryParse<std::array<float, 2>>(const std::string& str) {
+		auto vals = ParseFloatList(str);
+		if (vals.size() != 2) return std::nullopt;
+		return std::array{vals[0], vals[1]};
+	}
+
+	template <>
+	std::optional<std::array<float, 3>> TryParse<std::array<float, 3>>(const std::string& str) {
+		auto vals = ParseFloatList(str);
+		if (vals.size() != 3) return std::nullopt;
+		return std::array{vals[0], vals[1], vals[2]};
+	}
+
+	template <>
+	std::optional<std::array<float, 4>> TryParse<std::array<float, 4>>(const std::string& str) {
+		auto vals = ParseFloatList(str);
+		if (vals.size() != 4) return std::nullopt;
+		return std::array{vals[0], vals[1], vals[2], vals[3]};
+	}
+
+
 	void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity, GLsizei length,
 	                            const char* message, const void* userParam) {
 		// ignore non-significant error/warning codes
-		// if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
-		if (id == 131204 || id == 131185) return;
+		if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
 
 		std::string severityStr;
 		std::string sourceStr;

@@ -8,6 +8,7 @@
 
 #include "../game/scene.hpp"
 #include "shadow.hpp"
+#include "com/color.hpp"
 
 namespace Render {
 	struct PostEffects {
@@ -16,7 +17,7 @@ namespace Render {
 
 		bool vignette;
 		float vignetteIntensity;
-		glm::vec3 vignetteColor;
+		Color::rgb_t vignetteColor;
 	};
 }
 
@@ -36,7 +37,7 @@ namespace Renderer {
 	void UpdateRenderRes();
 
 	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h);
-	void DrawRectOnScreen(float x, float y, float w, float h, const glm::vec4& color);
+	void DrawRectOnScreen(float x, float y, float w, float h,  const Color::rgba_t& color);
 
 	void RenderClear();
 

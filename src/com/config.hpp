@@ -3,6 +3,8 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include "color.hpp"
+
 struct Config {
 	// --- SYSTEM ---
 	glm::ivec2 sys_windowResolution;
@@ -10,15 +12,15 @@ struct Config {
 	// --- RENDER ---
 	float r_gamma;
 	glm::ivec2 r_resolution;
-	uint16_t r_shadowRes;
+	int r_shadowRes;
 	float r_renderDistance;
 	bool r_vsync;
-	glm::vec3 r_fillColor;
+	Color::rgb_t r_fillColor;
 
 	// --- CONSOLE ---
-	int con_fontScale;
+	float con_fontScale;
 	int con_maxVisibleLines;
-	glm::vec4 con_backgroundColor;
+	Color::rgba_t con_backgroundColor;
 };
 
 extern Config g_config;

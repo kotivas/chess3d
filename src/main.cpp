@@ -2,27 +2,18 @@
 #include <algorithm>
 #include <array>
 #include <string>
-
 #include "com/config.hpp"
-#include "resourcemgr/resourcemgr.hpp"
 #include "game/scene.hpp"
 #include "render/model.hpp"
 #include "render/renderer.hpp"
-#include "render/shader.hpp"
-
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-
+#include "resourcemgr/resourcemgr.hpp"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <numeric>
-
 #include "./input/input.hpp"
-
 #include "stb_image_write.h"
-#include "com/util.hpp"
 #include "./text/MSDFText.hpp"
+#include "com/util.hpp"
 #include "console/console.hpp"
+#include "core/cmdsystem.hpp"
 #include "core/cvar.hpp"
 #include "core/logger.hpp"
 
@@ -89,228 +80,10 @@ static Render::PostEffects effects{
 
 	.vignette = true,
 	.vignetteIntensity = 0.25f,
-	.vignetteColor = glm::vec3(0)
+	.vignetteColor = {0, 0, 0}
 };
 
 static bool g_isFlashlight = false;
-static char g_imguilog[256];
-static std::array<float, 256> g_fpsarray = {0};
-static bool g_isDebugInfo = false;
-
-void DrawDebugInfo() {
-	ImGui::Begin("Debug Info", 0, ImGuiWindowFlags_NoTitleBar);
-
-	const float largest_num = *(std::ranges::max_element(g_fpsarray));
-	const float avg_num = std::accumulate(g_fpsarray.begin(), g_fpsarray.end(), 0.0) / g_fpsarray.size();
-
-	ImGui::PlotLines(" ", g_fpsarray.data(), g_fpsarray.size(), 0, ("avg: " + std::to_string(avg_num)).c_str(), 0,
-	                 largest_num + 200,
-	                 {300, 70});
-
-	ImGui::End(); // End general options
-}
-
-void DrawOptions() {
-	// General Options
-	ImGui::Begin("General Options");
-
-	if (ImGui::CollapsingHeader("Post Processing")) {
-		ImGui::Checkbox("Quantization", &effects.quantization);
-		ImGui::InputInt("Level", &effects.quantizationLevel);
-		ImGui::SeparatorText("");
-		ImGui::Checkbox("Vignette", &effects.vignette);
-		ImGui::SliderFloat("Intensity", &effects.vignetteIntensity, 0, 10, "%.2f");
-		ImGui::ColorEdit3("Color", &effects.vignetteColor[0]);
-	}
-
-	if (ImGui::CollapsingHeader("Render Settings")) {
-		//ImGui::ColorEdit3("Void Color", &voidColor[0]);
-		ImGui::SliderFloat("gamma", &g_config.r_gamma, 0, 10, "%.1f");
-		if (ImGui::InputInt2("Render Resolution", &g_config.r_resolution[0])) {
-			Renderer::UpdateRenderRes();
-		}
-		ImGui::ColorPicker3("Fill color", &g_config.r_fillColor[0]);
-		// if (ImGui::InputInt("Shadow Resolution", &config.shadowRes)) {
-		// renderer->updateShadowRes();
-		// }
-	}
-
-	if (ImGui::CollapsingHeader("Camera Settings")) {
-		ImGui::Text("Position: x: %f, y: %f, z: %f", scene.camera.position.x, scene.camera.position.y,
-		            scene.camera.position.z);
-		ImGui::SliderFloat("Field Of View", &scene.camera.fov, 0, 100, "%.2f");
-		ImGui::InputFloat3("Target", &scene.camera.target[0], "%.2f");
-		ImGui::SliderFloat("Sensitivity", &scene.camera.sens, 0, 10, "%.1f");
-	}
-
-	if (ImGui::CollapsingHeader("Light Settings")) {
-		if (ImGui::TreeNode("Directional Light")) {
-			ImGui::SliderInt("Enable", &scene.dirLight.enable, 0, 1);
-
-			ImGui::BeginDisabled(!scene.dirLight.enable);
-
-			//ImGui::ColorEdit3("Color", &scene.dirLight.color[0]);
-			ImGui::InputFloat3("Direction", &scene.dirLight.direction[0]);
-			ImGui::InputFloat3("Ambient", &scene.dirLight.ambient[0]);
-			ImGui::InputFloat3("Diffuse", &scene.dirLight.diffuse[0]);
-			ImGui::InputFloat3("Specular", &scene.dirLight.specular[0]);
-
-			ImGui::EndDisabled();
-			ImGui::TreePop();
-		}
-		if (ImGui::TreeNode("Point Light")) {
-			ImGui::SliderInt("Enable", &scene.pointLight.enable, 0, 1);
-
-			ImGui::BeginDisabled(!scene.pointLight.enable);
-
-			//ImGui::ColorEdit3("Color", &scene.pointLight.color[0]);
-
-			ImGui::InputFloat3("Position", &scene.pointLight.position[0]);
-			ImGui::InputFloat3("Ambient", &scene.pointLight.ambient[0]);
-			ImGui::InputFloat3("Diffuse", &scene.pointLight.diffuse[0]);
-			ImGui::InputFloat3("Specular", &scene.pointLight.specular[0]);
-
-			ImGui::InputFloat("Constant", &scene.pointLight.constant);
-			ImGui::InputFloat("Linear", &scene.pointLight.linear);
-			ImGui::InputFloat("Quadratic", &scene.pointLight.quadratic);
-
-			ImGui::EndDisabled();
-			ImGui::TreePop();
-		}
-		if (ImGui::TreeNode("Spot Light")) {
-			ImGui::SliderInt("Enable", &scene.spotLight.enable, 0, 1);
-
-			ImGui::BeginDisabled(!scene.spotLight.enable);
-
-			//ImGui::ColorEdit3("Color", &scene.spotLight.color[0]);
-
-			ImGui::InputFloat3("Position", &scene.spotLight.position[0]);
-			ImGui::InputFloat3("Direction", &scene.spotLight.direction[0]);
-
-			ImGui::InputFloat3("Ambient", &scene.spotLight.ambient[0]);
-			ImGui::InputFloat3("Diffuse", &scene.spotLight.diffuse[0]);
-			ImGui::InputFloat3("Specular", &scene.spotLight.specular[0]);
-
-			ImGui::InputFloat("Constant", &scene.spotLight.constant);
-			ImGui::InputFloat("Linear", &scene.spotLight.linear);
-			ImGui::InputFloat("Quadratic", &scene.spotLight.quadratic);
-
-			ImGui::SliderAngle("CutOff", &scene.spotLight.cutOff, 0, 180);
-			ImGui::SliderAngle("OuterCutOff", &scene.spotLight.outerCutOff, 0,
-			                   glm::degrees(scene.spotLight.cutOff) - 1);
-
-			ImGui::EndDisabled();
-			ImGui::TreePop();
-		}
-	}
-
-	if (ImGui::CollapsingHeader("Objects Settings")) {
-		for (const auto& model : scene.objects) {
-			if (ImGui::TreeNode(model->name.c_str())) {
-				ImGui::Checkbox("Cast Shadow", &model->castShadow);
-				ImGui::InputFloat3("Scale", &model->transform.scale[0]);
-				ImGui::InputFloat3("Position", &model->transform.position[0]);
-				ImGui::InputFloat3("Rotation", &model->transform.rotation[0]);
-				//
-				// if (ImGui::TreeNode("Meshes")) {
-				// 	if (ImGui::Button("Disable all")) {
-				// 		for (const auto& mesh : model->meshes) { mesh->drawable = false; }
-				// 	}
-				// 	ImGui::SameLine();
-				// 	if (ImGui::Button("Enable all")) {
-				// 		for (const auto& mesh : model->meshes) { mesh->drawable = true; }
-				// 	}
-				//
-				// 	for (const auto& mesh : model->meshes) {
-				// 		if (ImGui::TreeNode(mesh->name.c_str())) {
-				// 			ImGui::Checkbox("Draw", &mesh->drawable);
-				//
-				// 			ImGui::BeginDisabled(!mesh->drawable);
-				// 			ImGui::Text("Mat: %s", mesh->material->name.c_str());
-				//
-				// 			ImGui::InputFloat3("Position", &mesh->transform.position[0]);
-				// 			ImGui::SliderFloat3("Scale", &mesh->transform.scale[0], 1, 10, "%.1f");
-				// 			ImGui::InputFloat3("Rotation", &mesh->transform.rotation[0]);
-				//
-				// 			ImGui::EndDisabled();
-				//
-				// 			ImGui::TreePop();
-				// 		}
-				// 	}
-				// 	ImGui::TreePop();
-				// }
-				ImGui::TreePop();
-			}
-		}
-	}
-
-	if (ImGui::InputText("Log::Info", g_imguilog, 256)) {
-		Log::Info(g_imguilog);
-	}
-
-	ImGui::End(); // End general options
-}
-
-void SetStyleIMGUI() {
-	ImGuiStyle& style = ImGui::GetStyle();
-	ImVec4* colors = style.Colors;
-
-	// Setting up a dark theme base
-	// colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.6f); // Semi-transparent dark background
-	colors[ImGuiCol_WindowBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.1f); // Semi-transparent dark background
-	colors[ImGuiCol_ChildBg] = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
-	colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.8f);
-	colors[ImGuiCol_Border] = ImVec4(0.8f, 0.8f, 0.8f, 0.f);
-
-	// Text and frames
-	colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-	colors[ImGuiCol_FrameBg] = ImVec4(0.2f, 0.2f, 0.2f, 0.2f); // Semi-transparent for frosted look
-	colors[ImGuiCol_FrameBgHovered] = ImVec4(0.3f, 0.3f, 0.3f, 0.7f);
-	colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 0.9f);
-
-	// Header
-	colors[ImGuiCol_Header] = ImVec4(0.3f, 0.3f, 0.3f, 0.1f);
-	colors[ImGuiCol_HeaderHovered] = ImVec4(0.4f, 0.4f, 0.4f, 0.1f);
-	colors[ImGuiCol_HeaderActive] = ImVec4(0.4f, 0.4f, 0.4f, 0.1f);
-
-	// Buttons
-	colors[ImGuiCol_Button] = ImVec4(0.3f, 0.3f, 0.3f, 0.6f);
-	colors[ImGuiCol_ButtonHovered] = ImVec4(0.4f, 0.4f, 0.4f, 0.8f);
-	colors[ImGuiCol_ButtonActive] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
-
-	colors[ImGuiCol_PlotLines] = ImVec4(0.5, 0.5, 0.5, 1.0f);
-	colors[ImGuiCol_PlotLinesHovered] = ImVec4(1, 1, 1, 1.0f);
-
-	colors[ImGuiCol_TitleBgActive] = ImVec4(0, 0, 0, 0.3);
-	colors[ImGuiCol_TitleBg] = ImVec4(0, 0, 0, 0.3);
-
-	colors[ImGuiCol_ResizeGrip] = ImVec4(0, 0, 0, 0.3);
-	colors[ImGuiCol_ResizeGripActive] = ImVec4(0, 0, 0, 0.5);
-	colors[ImGuiCol_ResizeGripHovered] = ImVec4(0, 0, 0, 0.6);
-
-	// Adjust window rounding and padding to enhance the glass look
-	style.WindowRounding = 10.0f;
-	style.FrameRounding = 5.0f;
-	style.WindowPadding = ImVec2(10, 10);
-	// style.FramePadding = ImVec2(5, 5);
-}
-
-void InitIMGUI() {
-	// Setup ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO();
-	(void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-
-	// Setup ImGui style
-	ImGui::StyleColorsDark();
-	SetStyleIMGUI();
-
-	// Setup Platform/Renderer bindings
-	ImGui_ImplGlfw_InitForOpenGL(Renderer::g_window, true);
-	ImGui_ImplOpenGL3_Init("#version 330");
-}
 
 void SaveScreenshot(const char* filename) {
 	// Выделение памяти под пиксели (формат RGB)
@@ -347,8 +120,6 @@ void updateControls() {
 		glfwSetWindowShouldClose(Renderer::g_window, GL_TRUE);
 	} else if (Input::IsKeyPressed(GLFW_KEY_F11)) {
 		SaveScreenshot("frame.png");
-	} else if (Input::IsKeyPressed(GLFW_KEY_F12)) {
-		g_isDebugInfo = !g_isDebugInfo;
 	} else if (Input::IsKeyPressed(GLFW_KEY_F) && !Console::IsVisible()) {
 		g_isFlashlight = !g_isFlashlight;
 		Log::Debug("Flashlight: " + std::string(g_isFlashlight ? "on" : "off"));
@@ -378,19 +149,7 @@ void updateControls() {
 }
 
 void setupScene(bool props) {
-	// setup chess set
-
 	if (props) {
-		// Render::ModelPtr lightBulb = CreateLightSphere(0.1, 32, 32);
-		// Render::MeshPtr lightBulb = Util::CreateSphereMesh(0.1, 32, 32);
-		// lightBulb->castShadow = false;
-		// lightBulb->name = "LightBulb";
-		// lightBulb->material = std::make_shared<Render::Material>();
-		// lightBulb->material->shader = std::make_shared<Render::Shader>("shaders/light.vert",
-		//                                                                "shaders/light.frag");
-		// lightBulb->material->shininess = 255;
-		// scene.objects.push_back(lightBulb);
-
 		Render::ModelPtr toy = ResourceMgr::GetModelByName("slayer_toy");
 		toy->transform = {
 			.position = {-5, 16, 0},
@@ -403,9 +162,6 @@ void setupScene(bool props) {
 		desk->transform.scale = {20, 20, 20};
 		scene.objects.push_back(desk);
 	}
-
-	// create floor
-
 	Render::MeshPtr floor = Util::CreatePlaneMesh(8, "floor_plane");
 	floor->transform.scale = glm::vec3(g_config.r_renderDistance);
 	floor->material->shader = ResourceMgr::GetShaderByName("scene");
@@ -435,60 +191,83 @@ void LoadAll() {
 }
 
 void RegisterCVars() {
-	CVarSys::Register("r_gamma", "Adjusts screen gamma correction", 2.2, [](float val) { g_config.r_gamma = val; }, 0.f,
-	                  4.f, 2.2f);
-	CVarSys::Register("r_shadowRes", "Shadow map resolution", 2048.f,
-	                  [](float val) { g_config.r_shadowRes = static_cast<int>(val); }, 512.f, 8192.f, 2048.f);
+	// --- Camera ---
+	CMDSystem::Register("cam_position", "Camera position (Vec3f)", scene.camera.position);
+	CMDSystem::Register("cam_target", "Camera target (Vec3f)", scene.camera.target);
+	CMDSystem::Register("cam_radius", "Camera radius (Float)", scene.camera.radius, 0.f, 1000.f);
+	CMDSystem::Register("cam_yaw", "Camera yaw (Float)", scene.camera.yaw, -360.f, 360.f);
+	CMDSystem::Register("cam_pitch", "Camera pitch (Float)", scene.camera.pitch, -90.f, 90.f);
+	CMDSystem::Register("cam_sens", "Camera sensitivity (Float)", scene.camera.sens, 0.f, 5.f);
+	CMDSystem::Register("cam_fov", "Camera FOV (Float)", scene.camera.fov, 1.f, 180.f);
+	CMDSystem::Register("cam_locked", "Camera locked (Boolean)", scene.camera.locked);
 
-	CVarSys::Register("r_renderDistance", "Maximum render distance", 1000.f,
-	                  [](float val) { g_config.r_renderDistance = val; }, 100.f, 5000.f, 1000.f);
+	CMDSystem::Register("dir_enable", "Directional light enabled (Boolean)", scene.dirLight.enable);
+	CMDSystem::Register("dir_dir", "Directional light direction (Vec3f)", scene.dirLight.direction);
+	CMDSystem::Register("dir_ambient", "Directional light ambient (Vec3f)", scene.dirLight.ambient);
+	CMDSystem::Register("dir_diffuse", "Directional light diffuse (Vec3f)", scene.dirLight.diffuse);
+	CMDSystem::Register("dir_specular", "Directional light specular (Vec3f)", scene.dirLight.specular);
 
-	CVarSys::Register("r_vsync", "Vertical synchronization (1 = on, 0 = off)", g_config.r_vsync ? 1.f : 0.f,
-	                  [](float val) { g_config.r_vsync = val > 0.5f; }, 0.f, 1.f, 1.f);
+	CMDSystem::Register("pt_enable", "Point light enabled (Boolean)", scene.pointLight.enable);
+	CMDSystem::Register("pt_pos", "Point light position (Vec3f)", scene.pointLight.position);
+	CMDSystem::Register("pt_constant", "Point light constant (Float)", scene.pointLight.constant);
+	CMDSystem::Register("pt_linear", "Point light linear (Float)", scene.pointLight.linear);
+	CMDSystem::Register("pt_quadratic", "Point light quadratic (Float)", scene.pointLight.quadratic);
+	CMDSystem::Register("pt_ambient", "Point light ambient (Vec3f)", scene.pointLight.ambient);
+	CMDSystem::Register("pt_diffuse", "Point light diffuse (Vec3f)", scene.pointLight.diffuse);
+	CMDSystem::Register("pt_specular", "Point light specular (Vec3f)", scene.pointLight.specular);
 
-	CVarSys::Register("r_fillColor_r", "Background fill color (red)", g_config.r_fillColor.r,
-	                  [](float val) { g_config.r_fillColor.r = val; }, 0.f, 1.f, 0.3f);
-	CVarSys::Register("r_fillColor_g", "Background fill color (green)", g_config.r_fillColor.g,
-	                  [](float val) { g_config.r_fillColor.g = val; }, 0.f, 1.f, 0.3f);
-	CVarSys::Register("r_fillColor_b", "Background fill color (blue)", g_config.r_fillColor.b,
-	                  [](float val) { g_config.r_fillColor.b = val; }, 0.f, 1.f, 0.3f);
+	CMDSystem::Register("spot_enable", "Spot light enabled (Boolean)", scene.spotLight.enable);
+	CMDSystem::Register("spot_pos", "Spot light position (Vec3f)", scene.spotLight.position);
+	CMDSystem::Register("spot_dir", "Spot light direction (Vec3f)", scene.spotLight.direction);
+	CMDSystem::Register("spot_cutOff", "Spot light inner cutoff (Float)", scene.spotLight.cutOff);
+	CMDSystem::Register("spot_outerCutOff", "Spot light outer cutoff (Float)", scene.spotLight.outerCutOff);
+	CMDSystem::Register("spot_constant", "Spot light constant (Float)", scene.spotLight.constant);
+	CMDSystem::Register("spot_linear", "Spot light linear (Float)", scene.spotLight.linear);
+	CMDSystem::Register("spot_quadratic", "Spot light quadratic (Float)", scene.spotLight.quadratic);
+	CMDSystem::Register("spot_ambient", "Spot light ambient (Vec3f)", scene.spotLight.ambient);
+	CMDSystem::Register("spot_diffuse", "Spot light diffuse (Vec3f)", scene.spotLight.diffuse);
+	CMDSystem::Register("spot_specular", "Spot light specular (Vec3f)", scene.spotLight.specular);
 
+
+	// --- Rendering ---
+	CMDSystem::Register("r_gamma", "Adjusts screen gamma correction (Float)", g_config.r_gamma, 0.f, 4.f);
+	CMDSystem::Register("r_shadowRes", "Shadow map resolution (Integer)", g_config.r_shadowRes, 512.f, 8192.f);
+	CMDSystem::Register("r_renderDistance", "Maximum render distance (Float)", g_config.r_renderDistance, 100.f,
+	                    5000.f);
+	CMDSystem::Register("r_vsync", "Vertical synchronization (1 = on, 0 = off) (Boolean)", g_config.r_vsync);
+	CMDSystem::Register(CVar::cvar_t(
+		"r_fillColor", static_cast<std::array<float, 3>>(g_config.r_fillColor),
+		[](const CVar::cvar_t& cvar) {
+			g_config.r_fillColor = std::get<std::array<float, 3>>(cvar.val);
+		}, "Render fill color"
+	));
 	// --- Console ---
-	CVarSys::Register("con_fontScale", "Console font size scale", 32.f,
-	                  [](float val) { g_config.con_fontScale = val; }, 8.f, 128.f, 32.f);
-
-	CVarSys::Register("con_maxVisibleLines", "Maximum visible console lines", 20.f,
-	                  [](float val) { g_config.con_maxVisibleLines = static_cast<int>(val); }, 5.f, 100.f, 20.f);
-
-	CVarSys::Register("con_backgroundColor_r", "Console background color (red)", g_config.con_backgroundColor.r,
-	                  [](float val) { g_config.con_backgroundColor.r = val; }, 0.f, 1.f, 0.f);
-	CVarSys::Register("con_backgroundColor_g", "Console background color (green)", g_config.con_backgroundColor.g,
-	                  [](float val) { g_config.con_backgroundColor.g = val; }, 0.f, 1.f, 0.f);
-	CVarSys::Register("con_backgroundColor_b", "Console background color (blue)", g_config.con_backgroundColor.b,
-	                  [](float val) { g_config.con_backgroundColor.b = val; }, 0.f, 1.f, 0.f);
-	CVarSys::Register("con_backgroundColor_a", "Console background alpha", g_config.con_backgroundColor.a,
-	                  [](float val) { g_config.con_backgroundColor.a = val; }, 0.f, 1.f, 0.9f);
-
+	CMDSystem::Register("con_fontScale", "Console font size scale (Float)", g_config.con_fontScale, 8.f, 128.f);
+	CMDSystem::Register("con_maxVisibleLines", "Maximum visible console lines (Integer)", g_config.con_maxVisibleLines,
+	                    5.f, 100.f);
+	CMDSystem::Register(CVar::cvar_t(
+		"con_backgroundColor",
+		static_cast<std::array<float, 4>>(g_config.con_backgroundColor),
+		[](const CVar::cvar_t& cvar) {
+			g_config.con_backgroundColor = std::get<std::array<float, 4>>(cvar.val);
+		},
+		"Console background color (RGBA)"
+	));
 	// --- Post-processing / Effects ---
-	CVarSys::Register("fx_quantization", "Enable color quantization (1 = on, 0 = off)",
-	                  effects.quantization ? 1.f : 0.f,
-	                  [](float val) { effects.quantization = val > 0.5f; }, 0.f, 1.f, 0.f);
-
-	CVarSys::Register("fx_quantizationLevel", "Color quantization level", effects.quantizationLevel,
-	                  [](float val) { effects.quantizationLevel = static_cast<int>(val); }, 2.f, 16.f, 4.f);
-
-	CVarSys::Register("fx_vignette", "Enable vignette effect (1 = on, 0 = off)", effects.vignette ? 1.f : 0.f,
-	                  [](float val) { effects.vignette = val > 0.5f; }, 0.f, 1.f, 1.f);
-
-	CVarSys::Register("fx_vignetteIntensity", "Vignette intensity", effects.vignetteIntensity,
-	                  [](float val) { effects.vignetteIntensity = val; }, 0.f, 1.f, 0.25f);
-
-	CVarSys::Register("fx_vignetteColor_r", "Vignette color (red)", effects.vignetteColor.r,
-	                  [](float val) { effects.vignetteColor.r = val; }, 0.f, 1.f, 0.f);
-	CVarSys::Register("fx_vignetteColor_g", "Vignette color (green)", effects.vignetteColor.g,
-	                  [](float val) { effects.vignetteColor.g = val; }, 0.f, 1.f, 0.f);
-	CVarSys::Register("fx_vignetteColor_b", "Vignette color (blue)", effects.vignetteColor.b,
-	                  [](float val) { effects.vignetteColor.b = val; }, 0.f, 1.f, 0.f);
+	CMDSystem::Register("fx_quantization", "Enable color quantization (1 = on, 0 = off) (Boolean)",
+	                    effects.quantization);
+	CMDSystem::Register("fx_quantizationLevel", "Color quantization level (Integer)", effects.quantizationLevel, 2.f,
+	                    16.f);
+	CMDSystem::Register("fx_vignette", "Enable vignette effect (1 = on, 0 = off) (Boolean)", effects.vignette);
+	CMDSystem::Register("fx_vignetteIntensity", "Vignette intensity (Float)", effects.vignetteIntensity, 0.f, 1.f);
+	CMDSystem::Register(CVar::cvar_t(
+		"fx_vignetteColor",
+		static_cast<std::array<float, 3>>(effects.vignetteColor),
+		[](const CVar::cvar_t& cvar) {
+			effects.vignetteColor = std::get<std::array<float, 3>>(cvar.val);
+		},
+		"Vignette color (RGB)"
+	));
 }
 
 int main(int argc, char** argv) {
@@ -513,63 +292,32 @@ int main(int argc, char** argv) {
 	LoadAll();
 	Input::Init();
 	Console::Init();
-	InitIMGUI();
 	MSDFText::Init();
 
 	RegisterCVars();
 
 	// TODO make loading screen w/ progresbar
 	setupScene(true);
-
-	double lastTime = glfwGetTime();
-	int frameCount = 0;
-	uint8_t indexFPS = 0;
-
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
-		if (g_isDebugInfo) {
-			frameCount++;
-			g_fpsarray[indexFPS] = frameCount / (glfwGetTime() - lastTime);
-			indexFPS++;
-			frameCount = 0;
-			lastTime = glfwGetTime();
-		}
-
 		if (g_isFlashlight) {
 			scene.spotLight.position = scene.camera.position;
 			scene.spotLight.position.y -= 2;
 			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
 		}
 
+		// UPDATE
 		scene.camera.updatePosition();
 		updateControls();
 		Console::Update();
-
 		Input::PollEvents(); // always should be updated last
 
+		// RENDER
 		Renderer::GenShadowMaps(scene);
-
 		Renderer::FrameBegin(scene);
 		for (const auto& object : scene.objects) object->draw({});
 		Console::Draw();
 		Renderer::FrameEnd(effects);
-
-		// render imgui
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
-		DrawOptions();
-		if (g_isDebugInfo) DrawDebugInfo();
-		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-		glfwSwapBuffers(Renderer::g_window);
-		glfwPollEvents();
 	}
-
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
-
 	Renderer::Shutdown();
 	// Input::Shutdown();
 

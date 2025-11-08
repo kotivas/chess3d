@@ -57,7 +57,8 @@ namespace Renderer {
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 		//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-		g_window = glfwCreateWindow(g_config.sys_windowResolution.x, g_config.sys_windowResolution.y, "chess3d", nullptr, nullptr);
+		g_window = glfwCreateWindow(g_config.sys_windowResolution.x, g_config.sys_windowResolution.y, "chess3d",
+		                            nullptr, nullptr);
 
 		glfwMakeContextCurrent(g_window);
 		glfwSwapInterval(g_config.r_vsync); // vsync 1 - on; 0 - off
@@ -73,7 +74,8 @@ namespace Renderer {
 		glGenTextures(1, &textureColorBuffer);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
 		// glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, config.renderRes.x, config.renderRes.y, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA, GL_FLOAT,
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+		             GL_FLOAT,
 		             NULL);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -281,7 +283,8 @@ namespace Renderer {
 		UpdateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
 		UpdateUBOData(scene.camera.position);
 		UpdateUBOMatrices(
-			glm::perspective(glm::radians(scene.camera.fov), (float)g_config.sys_windowResolution.x / (float)g_config.sys_windowResolution.y,
+			glm::perspective(glm::radians(scene.camera.fov),
+			                 (float)g_config.sys_windowResolution.x / (float)g_config.sys_windowResolution.y,
 			                 0.1f, g_config.r_renderDistance), scene.camera.getViewMatrix(),
 			dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix
 		);
@@ -324,6 +327,8 @@ namespace Renderer {
 
 		glEnable(GL_DEPTH_TEST);
 		RenderClear();
+
+		glfwSwapBuffers(g_window);
 	}
 
 	// void Renderer::updateShadowRes() {
@@ -343,7 +348,7 @@ namespace Renderer {
 	// }
 
 
-	void DrawRectOnScreen(float x, float y, float w, float h, const glm::vec4& color) {
+	void DrawRectOnScreen(float x, float y, float w, float h, const Color::rgba_t& color) {
 		Render::ShaderPtr shader = ResourceMgr::GetShaderByName("solidcolor");
 
 		shader->use();
@@ -411,7 +416,8 @@ namespace Renderer {
 
 	void UpdateRenderRes() {
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA, GL_FLOAT,
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+		             GL_FLOAT,
 		             NULL);
 
 		glBindRenderbuffer(GL_RENDERBUFFER, RBO);

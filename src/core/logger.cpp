@@ -32,13 +32,10 @@ namespace Logger {
 			std::cout << "[WARNING] " << msg << std::endl;
 			break;
 		case Severity::Info:
-			std::cout << "[INFO] " << msg << std::endl;
+			std::cout << msg << std::endl;
 			break;
 		case Severity::Debug:
 			std::cout << "[DEBUG] " << msg << std::endl;
-			break;
-		case Severity::None:
-			std::cout << msg << std::endl;
 			break;
 		}
 	}

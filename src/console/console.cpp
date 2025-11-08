@@ -1,9 +1,11 @@
 #include "console.hpp"
 
 #include <format>
+#include <ranges>
 #include <sstream>
 
 #include "com/config.hpp"
+#include "core/cmdsystem.hpp"
 #include "core/cvar.hpp"
 #include "core/logger.hpp"
 #include "input/input.hpp"
@@ -50,37 +52,23 @@ namespace Console {
 			return;
 		}
 		if (name == "help") {
-			for (const auto& cvar : CVarSys::g_cvars) {
-				Print(Color::WHITE, cvar.name + ": " + cvar.desc);
+			for (const auto& val : CMDSystem::g_cvars | std::views::values) {
+				Print(Color::WHITE, val.name + ": " + val.desc);
 			}
 			return;
 		}
 
-		auto* cvar = CVarSys::Find(name);
-		if (!cvar) {
-			Log::Warning("Unknown command <" + name + ">");
-			return;
-		}
+		auto* cvar = CMDSystem::Find(name);
+		if (!cvar) return;
 
-		// Try to read a value, if any
 		if (!(iss >> value_str)) {
 			Print(Color::WHITE,
-			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name, cvar->val, cvar->desc,
-			                  cvar->defVal, cvar->min, cvar->max));
+			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name, "UNDEF", cvar->desc,
+			                  "DEFVAL", cvar->minFloat, cvar->maxFloat));
 			return;
 		}
 
-		// Try converting to float
-		float value;
-		try {
-			value = std::stof(value_str);
-		} catch (const std::exception& e) {
-			Print(Color::LIGHT_RED, "Invalid argument");
-			return;
-		}
-
-		// Execute
-		cvar->set(value);
+		CMDSystem::Execute(name, command.substr(command.find_first_of(' ')+1));
 	}
 
 
@@ -184,31 +172,21 @@ namespace Console {
 
 	void Print(const Logger::Severity sev, const std::string& message) {
 		Color::rgb_t color;
-		std::string output;
 
 		switch (sev) {
-		case Logger::Severity::Info:
-			color = Color::WHITE;
-			output = "INFO: " + message;
-			break;
-		case Logger::Severity::None:
-			color = Color::WHITE;
+		case Logger::Severity::Info: color = Color::WHITE;
 			break;
 		case Logger::Severity::Debug: color = Color::ORANGE;
-			output = "DEBUG: " + message;
 			break;
 		case Logger::Severity::Warning: color = Color::YELLOW;
-			output = "WARNING: " + message;
 			break;
 		case Logger::Severity::Error: color = Color::RED;
-			output = "ERROR: " + message;
 			break;
 		case Logger::Severity::Fatal: color = Color::MAROON;
-			output = "FATAL: " + message;
 			break;
 		}
 
-		Print({color, output});
+		Print({color, message});
 	}
 
 	void Print(const CMDLine& message) {
