@@ -1,10 +1,8 @@
-#include "cmdsystem.hpp"
-#include "logger.hpp"
+#include "cmdutils.hpp"
 #include "com/util.hpp"
+#include "logger.hpp"
 
-namespace CMDSystem {
-	std::unordered_map<std::string, CVar::cvar_t> g_cvars;
-
+namespace CMDUtils {
 	void Execute(const std::string& name, const std::string& args) {
 		auto* cvar = Find(name);
 		if (!cvar) return;
@@ -20,7 +18,7 @@ namespace CMDSystem {
 	}
 
 	void Register(const CVar::cvar_t& cvar) {
-		g_cvars.emplace(cvar.name, cvar);
+		CVar::g_cvars.emplace(cvar.name, cvar);
 	}
 
 	// --- float ---
@@ -103,16 +101,32 @@ namespace CMDSystem {
 		});
 	}
 
+	std::string ToString(const CVar::cvar_t::CVarValue& val) {
+		return std::visit([](auto&& arg) -> std::string {
+			using T = std::decay_t<decltype(arg)>;
+			if constexpr (std::is_same_v<T, bool>) {
+				return arg ? "true" : "false";
+			} else if constexpr (std::is_arithmetic_v<T>) {
+				return std::to_string(arg);
+			} else if constexpr (std::is_same_v<T, std::array<float, 2>> || std::is_same_v<T, std::array<float, 3>> || std::is_same_v<T, std::array<float, 4>>) {
+				// return Util::array_to_string(arg);
+				return "VEC";
+			} else {
+				Log::Warning("Unable to parse cvar value as string");
+				return "UNDEF";
+			}
+		}, val);
+	}
+
 	void Unregister(const std::string& name) {
-		g_cvars.erase(name);
+		CVar::g_cvars.erase(name);
 	}
 
 	CVar::cvar_t* Find(const std::string& name) {
-		const auto it = g_cvars.find(name);
-		if (it != g_cvars.end()) {
+		const auto it = CVar::g_cvars.find(name);
+		if (it != CVar::g_cvars.end()) {
 			return &it->second;
 		}
-		Log::Warning("CVarSys::Find: unable to find " + name);
 		return nullptr;
 	}
 }

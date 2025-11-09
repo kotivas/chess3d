@@ -9,6 +9,13 @@ struct Config {
 	// --- SYSTEM ---
 	glm::ivec2 sys_windowResolution;
 
+	// -- FX ---
+	bool fx_quantization;
+	int fx_quantizationLevel;
+	bool fx_vignette;
+	float fx_vignetteIntensity;
+	Color::rgb_t fx_vignetteColor;
+
 	// --- RENDER ---
 	float r_gamma;
 	glm::ivec2 r_resolution;

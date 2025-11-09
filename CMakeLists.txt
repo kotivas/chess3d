@@ -25,6 +25,7 @@ set(SOURCE
 		src/render/model.cpp
 		src/game/game.cpp
  		src/resourcemgr/resourcemgr.cpp
+		src/com/util.hpp
 		src/com/util.cpp
 		src/render/shadow.cpp
 		src/com/config.cpp
@@ -34,9 +35,11 @@ set(SOURCE
 		src/resourcemgr/resourcemgr_model.cpp
 		src/resourcemgr/resourcemgr_shader.cpp
 		src/core/logger.cpp
-		src/core/cmdsystem.cpp
-		src/core/cmdsystem.hpp
+		src/core/cmdutils.cpp
+		src/core/cmdutils.hpp
 		src/core/cvar.hpp
+		src/core/backend.cpp
+		src/core/backend.hpp
 )
 
 add_executable(chess3d ${SOURCE} )

@@ -1,10 +1,20 @@
 #include "util.hpp"
-#include "../core/logger.hpp"
 #include <fstream>
 #include <ranges>
 #include <sstream>
+#include "../core/logger.hpp"
 
 namespace Util {
+	template <typename T, size_t N>
+	std::string array_to_string(const std::array<T, N>& arr) {
+		std::ostringstream oss;
+		for (size_t i = 0; i < N; ++i) {
+			oss << arr[i];
+			if (i != N - 1) oss << ", ";
+		}
+		return oss.str();
+	}
+
 	std::string trim(const std::string& s) {
 		const auto start = std::find_if_not(s.begin(), s.end(), ::isspace);
 		const auto end = std::find_if_not(s.rbegin(), s.rend(), ::isspace).base();

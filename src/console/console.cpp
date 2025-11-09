@@ -5,7 +5,8 @@
 #include <sstream>
 
 #include "com/config.hpp"
-#include "core/cmdsystem.hpp"
+#include "core/backend.hpp"
+#include "core/cmdutils.hpp"
 #include "core/cvar.hpp"
 #include "core/logger.hpp"
 #include "input/input.hpp"
@@ -15,9 +16,15 @@
 
 namespace Console {
 	int g_scrollOffset = 0;
-	bool g_isVisible = false;
+	int g_historyIndex = -1;
+	int g_cursorIndent = 0;
 	std::string g_inputField;
+	std::string g_suggestion;
 	std::vector<CMDLine> g_messages;
+	std::deque<std::string> g_history;
+	bool g_isVisible = false;
+	bool g_blinked = false;
+	double g_blinkTimer = 0.f;
 
 	void Toggle() {
 		g_isVisible = !g_isVisible;
@@ -28,7 +35,7 @@ namespace Console {
 	}
 
 	void Init() {
-		// Print("Console inited");
+		// Print(Color::CYAN, "it is what it is");
 	}
 
 	void ExecuteCommand(const std::string& command) {
@@ -36,7 +43,7 @@ namespace Console {
 			return;
 
 		std::istringstream iss(command);
-		std::string name, value_str;
+		std::string name;
 
 		Print(Color::WHITE, "> " + command);
 
@@ -52,51 +59,102 @@ namespace Console {
 			return;
 		}
 		if (name == "help") {
-			for (const auto& val : CMDSystem::g_cvars | std::views::values) {
+			Print(Color::WHITE, "help: Show all avaliable commands");
+			Print(Color::WHITE, "clear: Clear console history");
+			Print(Color::WHITE, "status: Get resource usage for current process");
+			for (const auto& val : CVar::g_cvars | std::views::values) {
 				Print(Color::WHITE, val.name + ": " + val.desc);
 			}
 			return;
 		}
 
-		auto* cvar = CMDSystem::Find(name);
-		if (!cvar) return;
-
-		if (!(iss >> value_str)) {
+		if (name == "status") {
 			Print(Color::WHITE,
-			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name, "UNDEF", cvar->desc,
-			                  "DEFVAL", cvar->minFloat, cvar->maxFloat));
+			      "VirtMem usage (MB): " + std::to_string(float(Backend::VirtMemoryUsage()) / 8.f / 1024.f / 1024.f));
+			Print(Color::WHITE, "CPU usage (%) " + std::to_string(Backend::CpuUsage()));
+
 			return;
 		}
 
-		CMDSystem::Execute(name, command.substr(command.find_first_of(' ')+1));
+		auto* cvar = CMDUtils::Find(name);
+		if (!cvar) {
+			Log::Warning("Unknown command <" + name + ">");
+			return;
+		}
+
+		if (std::string value_str; !(iss >> value_str)) {
+			Print(Color::WHITE,
+			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name,
+			                  CMDUtils::ToString(cvar->val), cvar->desc,
+			                  CMDUtils::ToString(cvar->defVal), cvar->minFloat, cvar->maxFloat));
+			return;
+		}
+
+		CMDUtils::Execute(name, command.substr(command.find_first_of(' ') + 1));
 	}
 
 
-	void Update() {
+	void Update(double dt) {
 		if (!g_isVisible) return;
+
+		g_blinkTimer += dt;
+		if (g_blinkTimer >= BLINK_INTERVAL) {
+			g_blinked = !g_blinked;
+			g_blinkTimer -= BLINK_INTERVAL;
+		}
 
 		if (Input::GetScrollYOffset() != 0.f) {
 			g_scrollOffset += Input::GetScrollYOffset() < 0 ? -1 : 1;
 		}
 
-		g_inputField += Input::GetTextBuffer();
+		if (!g_history.empty()) {
+			if (Input::IsKeyPressed(GLFW_KEY_UP)) NavigateHistory(+1);
+			else if (Input::IsKeyPressed(GLFW_KEY_DOWN)) NavigateHistory(-1);
+		}
+
+		if (Input::IsKeyPressed(GLFW_KEY_RIGHT))
+			g_cursorIndent = std::max(0, g_cursorIndent - 1);
+		else if (Input::IsKeyPressed(GLFW_KEY_LEFT))
+			g_cursorIndent = std::min(
+				int(g_inputField.size()), g_cursorIndent + 1);
+
+
+		if (!Input::GetTextBuffer().empty()) {
+			g_inputField.insert(g_inputField.size() - g_cursorIndent, Input::GetTextBuffer());
+		}
+
 
 		if (!g_inputField.empty()) {
-			if (Input::IsKeyPressed(GLFW_KEY_BACKSPACE) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL)) {
-				std::size_t space_index = g_inputField.find_last_of(" ");
-				if (space_index == std::string::npos) { g_inputField.clear(); } else {
-					g_inputField.erase(space_index);
-				}
-			} else if (Input::IsKeyPressed(GLFW_KEY_BACKSPACE)) {
-				g_inputField.pop_back();
-			}
+			if (Input::IsKeyPressed(GLFW_KEY_BACKSPACE)) HandleBackspace();
 
 			if (Input::IsKeyPressed(GLFW_KEY_ENTER)) {
-				// g_messages.push_back({Color::WHITE, g_inputField});
 				ExecuteCommand(g_inputField);
+				g_history.push_front(g_inputField);
+				g_historyIndex = -1;
+				g_cursorIndent = 0;
 				g_inputField.clear();
+				g_suggestion.clear();
 			}
 		}
+	}
+
+	void NavigateHistory(int direction) {
+		if (g_history.empty()) return;
+
+		g_historyIndex = std::clamp(g_historyIndex + direction, -1, static_cast<int>(g_history.size()) - 1);
+		g_inputField = (g_historyIndex >= 0) ? g_history[g_historyIndex] : "";
+	}
+
+	void HandleBackspace() {
+		if (g_inputField.empty()) return;
+
+		g_cursorIndent = std::clamp(g_cursorIndent, 0, static_cast<int>(g_inputField.size()));
+		int erasePos = static_cast<int>(g_inputField.size()) - g_cursorIndent - 1;
+
+		if (erasePos >= 0 && erasePos < static_cast<int>(g_inputField.size()))
+			g_inputField.erase(erasePos, 1);
+		else if (g_cursorIndent == 0)
+			g_inputField.pop_back();
 	}
 
 	void Draw() {
@@ -118,11 +176,21 @@ namespace Console {
 		const float maxWidth = g_config.r_resolution.x - leftIndent;
 
 		Renderer::DrawRectOnScreen(0, 0, maxWidth + leftIndent, maxHeight, g_config.con_backgroundColor);
-		Renderer::DrawRectOnScreen(0, maxHeight, maxWidth + leftIndent, 1, {0.9, 0.3, 0, 1});
+		Renderer::DrawRectOnScreen(0, maxHeight, maxWidth + leftIndent, 1, {Color::YELLOW, 1});
 
 		// STER 0 --------------------------------- draw input field
 		MSDFText::DrawText("> " + g_inputField, font, leftIndent, maxHeight + font->descender * fontScale, fontScale,
 		                   {1, 1, 1, 1});
+
+		if (!g_blinked) {
+			float x = leftIndent;
+			std::string calcs = "> " + g_inputField;
+			calcs.erase(calcs.length() - g_cursorIndent, g_cursorIndent);
+			for (const char& cc : calcs) x += font->getGlyph(cc).advance * fontScale;
+
+			Renderer::DrawRectOnScreen(x, maxHeight - font->lineHeight * fontScale, 1, lineHeight / 2,
+			                           {Color::WHITE, 1});
+		}
 
 		if (g_messages.empty()) return;
 		// STEP 1 --------------------------------- get visible messages vector

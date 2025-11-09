@@ -10,16 +10,6 @@
 #include "shadow.hpp"
 #include "com/color.hpp"
 
-namespace Render {
-	struct PostEffects {
-		bool quantization;
-		int quantizationLevel;
-
-		bool vignette;
-		float vignetteIntensity;
-		Color::rgb_t vignetteColor;
-	};
-}
 
 namespace Renderer {
 	void Init();
@@ -31,7 +21,7 @@ namespace Renderer {
 	// draw scene to the FBO
 	void FrameBegin(Scene& scene);
 	// applying post fx and rendering to the screen FBO
-	void FrameEnd(Render::PostEffects effects);
+	void FrameEnd();
 
 	// void UpdateShadowRes();
 	void UpdateRenderRes();

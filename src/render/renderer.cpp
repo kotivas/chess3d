@@ -299,7 +299,7 @@ namespace Renderer {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
 	}
 
-	void FrameEnd(Render::PostEffects effects) {
+	void FrameEnd() {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
 
@@ -312,13 +312,13 @@ namespace Renderer {
 
 		postfxShader->setUniform1f("effects.gamma", g_config.r_gamma);
 
-		postfxShader->setUniform1i("effects.quantization", effects.quantization);
-		postfxShader->setUniform1i("effects.quantizationLevel", effects.quantizationLevel);
+		postfxShader->setUniform1i("effects.quantization",g_config.fx_quantization);
+		postfxShader->setUniform1i("effects.quantizationLevel", g_config.fx_quantizationLevel);
 		postfxShader->setUniform2f("resolution", g_config.sys_windowResolution);
 
-		postfxShader->setUniform1i("effects.vignette", effects.vignette);
-		postfxShader->setUniform1f("effects.vignetteIntensity", effects.vignetteIntensity);
-		postfxShader->setUniform3f("effects.vignetteColor", effects.vignetteColor);
+		postfxShader->setUniform1i("effects.vignette", g_config.fx_vignette);
+		postfxShader->setUniform1f("effects.vignetteIntensity", g_config.fx_vignetteIntensity);
+		postfxShader->setUniform3f("effects.vignetteColor", g_config.fx_vignetteColor);
 
 		glBindVertexArray(quadVAO);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);

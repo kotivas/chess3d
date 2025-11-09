@@ -80,4 +80,7 @@ namespace CVar {
 			if (cb) cb(*this);
 		}
 	} typedef cvar_t;
+
+	inline std::unordered_map<std::string, cvar_t> g_cvars;
+
 }

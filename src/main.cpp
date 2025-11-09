@@ -13,7 +13,8 @@
 #include "./text/MSDFText.hpp"
 #include "com/util.hpp"
 #include "console/console.hpp"
-#include "core/cmdsystem.hpp"
+#include "core/backend.hpp"
+#include "core/cmdutils.hpp"
 #include "core/cvar.hpp"
 #include "core/logger.hpp"
 
@@ -73,14 +74,6 @@ static Scene scene{
 		.diffuse = glm::vec3(1.f),
 		.specular = glm::vec3(1.f),
 	}
-};
-static Render::PostEffects effects{
-	.quantization = false,
-	.quantizationLevel = 4,
-
-	.vignette = true,
-	.vignetteIntensity = 0.25f,
-	.vignetteColor = {0, 0, 0}
 };
 
 static bool g_isFlashlight = false;
@@ -148,20 +141,19 @@ void updateControls() {
 	if (!Console::IsVisible()) scene.camera.mouseScrolled(Input::GetScrollYOffset(), g_config.r_renderDistance);
 }
 
-void setupScene(bool props) {
-	if (props) {
-		Render::ModelPtr toy = ResourceMgr::GetModelByName("slayer_toy");
-		toy->transform = {
-			.position = {-5, 16, 0},
-			.rotation = {-90, 0, -45},
-			.scale = glm::vec3(0.3f)
-		};
-		scene.objects.push_back(toy);
+void setupScene() {
+	Render::ModelPtr toy = ResourceMgr::GetModelByName("slayer_toy");
+	toy->transform = {
+		.position = {-5, 16, 0},
+		.rotation = {-90, 0, -45},
+		.scale = glm::vec3(0.3f)
+	};
+	scene.objects.push_back(toy);
 
-		Render::ModelPtr desk = ResourceMgr::GetModelByName("desk");
-		desk->transform.scale = {20, 20, 20};
-		scene.objects.push_back(desk);
-	}
+	Render::ModelPtr desk = ResourceMgr::GetModelByName("desk");
+	desk->transform.scale = {20, 20, 20};
+	scene.objects.push_back(desk);
+
 	Render::MeshPtr floor = Util::CreatePlaneMesh(8, "floor_plane");
 	floor->transform.scale = glm::vec3(g_config.r_renderDistance);
 	floor->material->shader = ResourceMgr::GetShaderByName("scene");
@@ -192,60 +184,59 @@ void LoadAll() {
 
 void RegisterCVars() {
 	// --- Camera ---
-	CMDSystem::Register("cam_position", "Camera position (Vec3f)", scene.camera.position);
-	CMDSystem::Register("cam_target", "Camera target (Vec3f)", scene.camera.target);
-	CMDSystem::Register("cam_radius", "Camera radius (Float)", scene.camera.radius, 0.f, 1000.f);
-	CMDSystem::Register("cam_yaw", "Camera yaw (Float)", scene.camera.yaw, -360.f, 360.f);
-	CMDSystem::Register("cam_pitch", "Camera pitch (Float)", scene.camera.pitch, -90.f, 90.f);
-	CMDSystem::Register("cam_sens", "Camera sensitivity (Float)", scene.camera.sens, 0.f, 5.f);
-	CMDSystem::Register("cam_fov", "Camera FOV (Float)", scene.camera.fov, 1.f, 180.f);
-	CMDSystem::Register("cam_locked", "Camera locked (Boolean)", scene.camera.locked);
+	CMDUtils::Register("cam_position", "Camera position (Vec3f)", scene.camera.position);
+	CMDUtils::Register("cam_target", "Camera target (Vec3f)", scene.camera.target);
+	CMDUtils::Register("cam_radius", "Camera radius (Float)", scene.camera.radius, 0.f, 1000.f);
+	CMDUtils::Register("cam_yaw", "Camera yaw (Float)", scene.camera.yaw, -360.f, 360.f);
+	CMDUtils::Register("cam_pitch", "Camera pitch (Float)", scene.camera.pitch, -90.f, 90.f);
+	CMDUtils::Register("cam_sens", "Camera sensitivity (Float)", scene.camera.sens, 0.f, 5.f);
+	CMDUtils::Register("cam_fov", "Camera FOV (Float)", scene.camera.fov, 1.f, 180.f);
 
-	CMDSystem::Register("dir_enable", "Directional light enabled (Boolean)", scene.dirLight.enable);
-	CMDSystem::Register("dir_dir", "Directional light direction (Vec3f)", scene.dirLight.direction);
-	CMDSystem::Register("dir_ambient", "Directional light ambient (Vec3f)", scene.dirLight.ambient);
-	CMDSystem::Register("dir_diffuse", "Directional light diffuse (Vec3f)", scene.dirLight.diffuse);
-	CMDSystem::Register("dir_specular", "Directional light specular (Vec3f)", scene.dirLight.specular);
+	CMDUtils::Register("dir_enable", "Directional light enabled (Boolean)", scene.dirLight.enable);
+	CMDUtils::Register("dir_dir", "Directional light direction (Vec3f)", scene.dirLight.direction);
+	CMDUtils::Register("dir_ambient", "Directional light ambient (Vec3f)", scene.dirLight.ambient);
+	CMDUtils::Register("dir_diffuse", "Directional light diffuse (Vec3f)", scene.dirLight.diffuse);
+	CMDUtils::Register("dir_specular", "Directional light specular (Vec3f)", scene.dirLight.specular);
 
-	CMDSystem::Register("pt_enable", "Point light enabled (Boolean)", scene.pointLight.enable);
-	CMDSystem::Register("pt_pos", "Point light position (Vec3f)", scene.pointLight.position);
-	CMDSystem::Register("pt_constant", "Point light constant (Float)", scene.pointLight.constant);
-	CMDSystem::Register("pt_linear", "Point light linear (Float)", scene.pointLight.linear);
-	CMDSystem::Register("pt_quadratic", "Point light quadratic (Float)", scene.pointLight.quadratic);
-	CMDSystem::Register("pt_ambient", "Point light ambient (Vec3f)", scene.pointLight.ambient);
-	CMDSystem::Register("pt_diffuse", "Point light diffuse (Vec3f)", scene.pointLight.diffuse);
-	CMDSystem::Register("pt_specular", "Point light specular (Vec3f)", scene.pointLight.specular);
+	CMDUtils::Register("pt_enable", "Point light enabled (Boolean)", scene.pointLight.enable);
+	CMDUtils::Register("pt_pos", "Point light position (Vec3f)", scene.pointLight.position);
+	CMDUtils::Register("pt_constant", "Point light constant (Float)", scene.pointLight.constant);
+	CMDUtils::Register("pt_linear", "Point light linear (Float)", scene.pointLight.linear);
+	CMDUtils::Register("pt_quadratic", "Point light quadratic (Float)", scene.pointLight.quadratic);
+	CMDUtils::Register("pt_ambient", "Point light ambient (Vec3f)", scene.pointLight.ambient);
+	CMDUtils::Register("pt_diffuse", "Point light diffuse (Vec3f)", scene.pointLight.diffuse);
+	CMDUtils::Register("pt_specular", "Point light specular (Vec3f)", scene.pointLight.specular);
 
-	CMDSystem::Register("spot_enable", "Spot light enabled (Boolean)", scene.spotLight.enable);
-	CMDSystem::Register("spot_pos", "Spot light position (Vec3f)", scene.spotLight.position);
-	CMDSystem::Register("spot_dir", "Spot light direction (Vec3f)", scene.spotLight.direction);
-	CMDSystem::Register("spot_cutOff", "Spot light inner cutoff (Float)", scene.spotLight.cutOff);
-	CMDSystem::Register("spot_outerCutOff", "Spot light outer cutoff (Float)", scene.spotLight.outerCutOff);
-	CMDSystem::Register("spot_constant", "Spot light constant (Float)", scene.spotLight.constant);
-	CMDSystem::Register("spot_linear", "Spot light linear (Float)", scene.spotLight.linear);
-	CMDSystem::Register("spot_quadratic", "Spot light quadratic (Float)", scene.spotLight.quadratic);
-	CMDSystem::Register("spot_ambient", "Spot light ambient (Vec3f)", scene.spotLight.ambient);
-	CMDSystem::Register("spot_diffuse", "Spot light diffuse (Vec3f)", scene.spotLight.diffuse);
-	CMDSystem::Register("spot_specular", "Spot light specular (Vec3f)", scene.spotLight.specular);
+	CMDUtils::Register("spot_enable", "Spot light enabled (Boolean)", scene.spotLight.enable);
+	CMDUtils::Register("spot_pos", "Spot light position (Vec3f)", scene.spotLight.position);
+	CMDUtils::Register("spot_dir", "Spot light direction (Vec3f)", scene.spotLight.direction);
+	CMDUtils::Register("spot_cutOff", "Spot light inner cutoff (Float)", scene.spotLight.cutOff);
+	CMDUtils::Register("spot_outerCutOff", "Spot light outer cutoff (Float)", scene.spotLight.outerCutOff);
+	CMDUtils::Register("spot_constant", "Spot light constant (Float)", scene.spotLight.constant);
+	CMDUtils::Register("spot_linear", "Spot light linear (Float)", scene.spotLight.linear);
+	CMDUtils::Register("spot_quadratic", "Spot light quadratic (Float)", scene.spotLight.quadratic);
+	CMDUtils::Register("spot_ambient", "Spot light ambient (Vec3f)", scene.spotLight.ambient);
+	CMDUtils::Register("spot_diffuse", "Spot light diffuse (Vec3f)", scene.spotLight.diffuse);
+	CMDUtils::Register("spot_specular", "Spot light specular (Vec3f)", scene.spotLight.specular);
 
 
 	// --- Rendering ---
-	CMDSystem::Register("r_gamma", "Adjusts screen gamma correction (Float)", g_config.r_gamma, 0.f, 4.f);
-	CMDSystem::Register("r_shadowRes", "Shadow map resolution (Integer)", g_config.r_shadowRes, 512.f, 8192.f);
-	CMDSystem::Register("r_renderDistance", "Maximum render distance (Float)", g_config.r_renderDistance, 100.f,
-	                    5000.f);
-	CMDSystem::Register("r_vsync", "Vertical synchronization (1 = on, 0 = off) (Boolean)", g_config.r_vsync);
-	CMDSystem::Register(CVar::cvar_t(
+	CMDUtils::Register("r_gamma", "Adjusts screen gamma correction (Float)", g_config.r_gamma, 0.f, 4.f);
+	CMDUtils::Register("r_shadowRes", "Shadow map resolution (Integer)", g_config.r_shadowRes, 512.f, 8192.f);
+	CMDUtils::Register("r_renderDistance", "Maximum render distance (Float)", g_config.r_renderDistance, 100.f,
+	                   5000.f);
+	CMDUtils::Register("r_vsync", "Vertical synchronization (1 = on, 0 = off) (Boolean)", g_config.r_vsync);
+	CMDUtils::Register(CVar::cvar_t(
 		"r_fillColor", static_cast<std::array<float, 3>>(g_config.r_fillColor),
 		[](const CVar::cvar_t& cvar) {
 			g_config.r_fillColor = std::get<std::array<float, 3>>(cvar.val);
 		}, "Render fill color"
 	));
 	// --- Console ---
-	CMDSystem::Register("con_fontScale", "Console font size scale (Float)", g_config.con_fontScale, 8.f, 128.f);
-	CMDSystem::Register("con_maxVisibleLines", "Maximum visible console lines (Integer)", g_config.con_maxVisibleLines,
-	                    5.f, 100.f);
-	CMDSystem::Register(CVar::cvar_t(
+	CMDUtils::Register("con_fontScale", "Console font size scale (Float)", g_config.con_fontScale, 8.f, 128.f);
+	CMDUtils::Register("con_maxVisibleLines", "Maximum visible console lines (Integer)", g_config.con_maxVisibleLines,
+	                   5.f, 100.f);
+	CMDUtils::Register(CVar::cvar_t(
 		"con_backgroundColor",
 		static_cast<std::array<float, 4>>(g_config.con_backgroundColor),
 		[](const CVar::cvar_t& cvar) {
@@ -254,17 +245,17 @@ void RegisterCVars() {
 		"Console background color (RGBA)"
 	));
 	// --- Post-processing / Effects ---
-	CMDSystem::Register("fx_quantization", "Enable color quantization (1 = on, 0 = off) (Boolean)",
-	                    effects.quantization);
-	CMDSystem::Register("fx_quantizationLevel", "Color quantization level (Integer)", effects.quantizationLevel, 2.f,
-	                    16.f);
-	CMDSystem::Register("fx_vignette", "Enable vignette effect (1 = on, 0 = off) (Boolean)", effects.vignette);
-	CMDSystem::Register("fx_vignetteIntensity", "Vignette intensity (Float)", effects.vignetteIntensity, 0.f, 1.f);
-	CMDSystem::Register(CVar::cvar_t(
+	CMDUtils::Register("fx_quantization", "Enable color quantization (1 = on, 0 = off) (Boolean)",
+	                   g_config.fx_quantization);
+	CMDUtils::Register("fx_quantizationLevel", "Color quantization level (Integer)", g_config.fx_quantizationLevel, 2.f,
+	                   16.f);
+	CMDUtils::Register("fx_vignette", "Enable vignette effect (1 = on, 0 = off) (Boolean)", g_config.fx_vignette);
+	CMDUtils::Register("fx_vignetteIntensity", "Vignette intensity (Float)", g_config.fx_vignetteIntensity, 0.f, 1.f);
+	CMDUtils::Register(CVar::cvar_t(
 		"fx_vignetteColor",
-		static_cast<std::array<float, 3>>(effects.vignetteColor),
+		static_cast<std::array<float, 3>>(g_config.fx_vignetteColor),
 		[](const CVar::cvar_t& cvar) {
-			effects.vignetteColor = std::get<std::array<float, 3>>(cvar.val);
+			g_config.fx_vignetteColor = std::get<std::array<float, 3>>(cvar.val);
 		},
 		"Vignette color (RGB)"
 	));
@@ -274,11 +265,17 @@ int main(int argc, char** argv) {
 	g_config = {
 		.sys_windowResolution = {1280, 720},
 
+		.fx_quantization = false,
+		.fx_quantizationLevel = 4,
+		.fx_vignette = true,
+		.fx_vignetteIntensity = 0.25f,
+		.fx_vignetteColor = {0, 0, 0},
+
 		.r_gamma = 2.2,
 		.r_resolution = {2560, 1440}, // 2x sampling
 		.r_shadowRes = 2048,
 		.r_renderDistance = 1000.f,
-		.r_vsync = true,
+		.r_vsync = false,
 		.r_fillColor = {0.3, 0.3, 0.3},
 
 		.con_fontScale = 32,
@@ -293,12 +290,25 @@ int main(int argc, char** argv) {
 	Input::Init();
 	Console::Init();
 	MSDFText::Init();
+	Backend::Init();
 
 	RegisterCVars();
 
 	// TODO make loading screen w/ progresbar
-	setupScene(true);
+	setupScene();
+	double lastTime = glfwGetTime();
+	int fps = 0;
+	double timer = 0;
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
+		const double dt = glfwGetTime() - lastTime;
+
+		timer += dt;
+		if (timer > 0.5) {
+			timer -= 0.5;
+			fps = 1 / dt;
+		}
+
+		lastTime = glfwGetTime();
 		if (g_isFlashlight) {
 			scene.spotLight.position = scene.camera.position;
 			scene.spotLight.position.y -= 2;
@@ -308,7 +318,7 @@ int main(int argc, char** argv) {
 		// UPDATE
 		scene.camera.updatePosition();
 		updateControls();
-		Console::Update();
+		Console::Update(dt);
 		Input::PollEvents(); // always should be updated last
 
 		// RENDER
@@ -316,7 +326,11 @@ int main(int argc, char** argv) {
 		Renderer::FrameBegin(scene);
 		for (const auto& object : scene.objects) object->draw({});
 		Console::Draw();
-		Renderer::FrameEnd(effects);
+		MSDFText::DrawText(std::to_string(fps), ResourceMgr::GetFontByName("inconsolata_light"),
+		                   g_config.r_resolution.x - 60,
+		                   g_config.r_resolution.y - 32, 32,
+		                   {Color::WHITE, 1});
+		Renderer::FrameEnd();
 	}
 	Renderer::Shutdown();
 	// Input::Shutdown();
