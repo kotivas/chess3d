@@ -1,4 +1,5 @@
 #pragma once
+#include <format>
 #include <string>
 #include <vector>
 
@@ -23,7 +24,7 @@ namespace Logger {
 			: _severity(Severity::Debug) {} // log everything
 
 		void addSink(ILogSink* sink);
-		void log(Severity sev, const std::string& msg) const;
+		void log(Severity sev, std::string_view fmt, std::format_args args) const;
 		void setSeverity(Severity sev);
 
 	private:
@@ -46,11 +47,35 @@ namespace Log {
 	void Init();
 	Logger::Logger* GetLogger();
 
-	void Debug(const std::string& msg);
-	void Info(const std::string& msg);
-	void Warning(const std::string& msg);
-	void Error(const std::string& msg);
-	void Fatal(const std::string& msg);
-	void Log(Logger::Severity sev, const std::string& msg);
+	template <typename... Args>
+	void Debug(const std::string_view fmt, Args&&... args) {
+		g_logger->log(Logger::Severity::Debug, fmt, std::make_format_args(std::forward<Args>(args)...));
+	}
+
+	template <typename... Args>
+	void Info(const std::string_view fmt, Args&&... args) {
+		g_logger->log(Logger::Severity::Info, fmt, std::make_format_args(std::forward<Args>(args)...));
+	}
+
+	template <typename... Args>
+	void Warning(const std::string_view fmt, Args&&... args) {
+		g_logger->log(Logger::Severity::Warning, fmt, std::make_format_args(std::forward<Args>(args)...));
+	}
+
+	template <typename... Args>
+	void Error(const std::string_view fmt, Args&&... args) {
+		g_logger->log(Logger::Severity::Error, fmt, std::make_format_args(std::forward<Args>(args)...));
+	}
+
+	template <typename... Args>
+	void Fatal(const std::string_view fmt, Args&&... args) {
+		g_logger->log(Logger::Severity::Fatal, fmt, std::make_format_args(std::forward<Args>(args)...));
+	}
+
+	template <typename... Args>
+	void Log(const Logger::Severity sev, const std::string_view fmt, Args&&... args) {
+		g_logger->log(sev, fmt, std::make_format_args(std::forward<Args>(args)...));
+	}
+
 	void SetSeverity(Logger::Severity sev);
 }

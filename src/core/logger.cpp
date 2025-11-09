@@ -1,6 +1,8 @@
 #include "core/logger.hpp"
 
+#include <format>
 #include <iostream>
+#include <sstream>
 #include "console/console.hpp"
 
 namespace Logger {
@@ -8,7 +10,8 @@ namespace Logger {
 		_sinks.push_back(sink);
 	}
 
-	void Logger::log(const Severity sev, const std::string& msg) const {
+	void Logger::log(const Severity sev, const std::string_view fmt, const std::format_args args) const {
+		const std::string msg = std::vformat(fmt, args);
 		if (sev <= _severity) {
 			for (const auto& s : _sinks) {
 				s->write(sev, msg);
@@ -57,30 +60,6 @@ namespace Log {
 
 	Logger::Logger* GetLogger() {
 		return g_logger;
-	}
-
-	void Debug(const std::string& msg) {
-		g_logger->log(Logger::Severity::Debug, msg);
-	}
-
-	void Info(const std::string& msg) {
-		g_logger->log(Logger::Severity::Info, msg);
-	}
-
-	void Warning(const std::string& msg) {
-		g_logger->log(Logger::Severity::Warning, msg);
-	}
-
-	void Error(const std::string& msg) {
-		g_logger->log(Logger::Severity::Error, msg);
-	}
-
-	void Fatal(const std::string& msg) {
-		g_logger->log(Logger::Severity::Fatal, msg);
-	}
-
-	void Log(const Logger::Severity sev, const std::string& msg) {
-		g_logger->log(sev, msg);
 	}
 
 	void SetSeverity(const Logger::Severity sev) {
