@@ -10,6 +10,7 @@ struct Config {
 	glm::ivec2 sys_windowResolution;
 
 	// -- FX ---
+	float fx_chromaticOffset;
 	bool fx_quantization;
 	int fx_quantizationLevel;
 	bool fx_vignette;

@@ -312,7 +312,11 @@ namespace Renderer {
 
 		postfxShader->setUniform1f("effects.gamma", g_config.r_gamma);
 
-		postfxShader->setUniform1i("effects.quantization",g_config.fx_quantization);
+		postfxShader->setUniform1f("time", glfwGetTime());
+
+		postfxShader->setUniform1f("effects.chromaticOffset", g_config.fx_chromaticOffset);
+
+		postfxShader->setUniform1i("effects.quantization", g_config.fx_quantization);
 		postfxShader->setUniform1i("effects.quantizationLevel", g_config.fx_quantizationLevel);
 		postfxShader->setUniform2f("resolution", g_config.sys_windowResolution);
 

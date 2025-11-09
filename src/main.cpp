@@ -233,6 +233,7 @@ void RegisterCVars() {
 		}, "Render fill color"
 	));
 	// --- Console ---
+
 	CMDUtils::Register("con_fontScale", "Console font size scale (Float)", g_config.con_fontScale, 8.f, 128.f);
 	CMDUtils::Register("con_maxVisibleLines", "Maximum visible console lines (Integer)", g_config.con_maxVisibleLines,
 	                   5.f, 100.f);
@@ -245,6 +246,8 @@ void RegisterCVars() {
 		"Console background color (RGBA)"
 	));
 	// --- Post-processing / Effects ---
+	CMDUtils::Register("fx_chromaticOffset", "Strength of chromatic abberation", g_config.fx_chromaticOffset);
+
 	CMDUtils::Register("fx_quantization", "Enable color quantization (1 = on, 0 = off) (Boolean)",
 	                   g_config.fx_quantization);
 	CMDUtils::Register("fx_quantizationLevel", "Color quantization level (Integer)", g_config.fx_quantizationLevel, 2.f,
@@ -264,6 +267,8 @@ void RegisterCVars() {
 int main(int argc, char** argv) {
 	g_config = {
 		.sys_windowResolution = {1280, 720},
+
+		.fx_chromaticOffset = 0.002f,
 
 		.fx_quantization = false,
 		.fx_quantizationLevel = 4,
@@ -291,7 +296,6 @@ int main(int argc, char** argv) {
 	Console::Init();
 	MSDFText::Init();
 	Backend::Init();
-
 	RegisterCVars();
 
 	// TODO make loading screen w/ progresbar
