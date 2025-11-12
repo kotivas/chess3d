@@ -108,13 +108,13 @@ namespace Console {
 		}
 
 		if (!g_history.empty()) {
-			if (Input::IsKeyPressed(GLFW_KEY_UP)) NavigateHistory(+1);
-			else if (Input::IsKeyPressed(GLFW_KEY_DOWN)) NavigateHistory(-1);
+			if (Input::IsKeyPressed(Key::Up)) NavigateHistory(+1);
+			else if (Input::IsKeyPressed(Key::Down)) NavigateHistory(-1);
 		}
 
-		if (Input::IsKeyPressed(GLFW_KEY_RIGHT))
+		if (Input::IsKeyPressed(Key::Right))
 			g_cursorIndent = std::max(0, g_cursorIndent - 1);
-		else if (Input::IsKeyPressed(GLFW_KEY_LEFT))
+		else if (Input::IsKeyPressed(Key::Left))
 			g_cursorIndent = std::min(
 				int(g_inputField.size()), g_cursorIndent + 1);
 
@@ -125,9 +125,9 @@ namespace Console {
 
 
 		if (!g_inputField.empty()) {
-			if (Input::IsKeyPressed(GLFW_KEY_BACKSPACE)) HandleBackspace();
+			if (Input::IsKeyPressed(Key::Backspace)) HandleBackspace();
 
-			if (Input::IsKeyPressed(GLFW_KEY_ENTER)) {
+			if (Input::IsKeyPressed(Key::Enter)) {
 				ExecuteCommand(g_inputField);
 				g_history.push_front(g_inputField);
 				g_historyIndex = -1;

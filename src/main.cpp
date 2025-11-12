@@ -79,7 +79,7 @@ static Scene scene{
 static bool g_isFlashlight = false;
 
 void SaveScreenshot(const char* filename) {
-	// Выделение памяти под пиксели (формат RGB)
+	// Выделение памяти под пиксели (формат
 	std::vector<unsigned char> pixels(g_config.sys_windowResolution.x * g_config.sys_windowResolution.y * 3);
 
 	// Настройка параметров чтения пикселей
@@ -109,19 +109,19 @@ void SaveScreenshot(const char* filename) {
 }
 
 void updateControls() {
-	if (Input::IsKeyPressed(GLFW_KEY_ESCAPE)) {
+	if (Input::IsKeyPressed(Key::Escape)) {
 		glfwSetWindowShouldClose(Renderer::g_window, GL_TRUE);
-	} else if (Input::IsKeyPressed(GLFW_KEY_F11)) {
+	} else if (Input::IsKeyPressed(Key::F11)) {
 		SaveScreenshot("frame.png");
-	} else if (Input::IsKeyPressed(GLFW_KEY_F) && !Console::IsVisible()) {
+	} else if (Input::IsKeyPressed(Key::F) && !Console::IsVisible()) {
 		g_isFlashlight = !g_isFlashlight;
 		Log::Debug("Flashlight: " + std::string(g_isFlashlight ? "on" : "off"));
 		scene.spotLight.enable = g_isFlashlight;
-	} else if (Input::IsKeyPressed(GLFW_KEY_P) && !Console::IsVisible()) {
+	} else if (Input::IsKeyPressed(Key::P) && !Console::IsVisible()) {
 		scene.pointLight.enable = !scene.pointLight.enable;
 	}
 
-	if (Input::IsKeyPressed(GLFW_KEY_GRAVE_ACCENT)) Console::Toggle();
+	if (Input::IsKeyPressed(Key::GraveAccent)) Console::Toggle();
 
 	if (Input::IsRightMouseDown()) {
 		scene.camera.locked = false;
@@ -164,7 +164,6 @@ void setupScene() {
 void LoadAll() {
 	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata_light.png",
 	                          "assets/fonts/inconsolata_light.json");
-
 	// ALL SHADERS
 	ResourceMgr::LoadShader("postfx", "shaders/postfx.vert",
 	                        "shaders/postfx.frag");
@@ -268,7 +267,7 @@ int main(int argc, char** argv) {
 	g_config = {
 		.sys_windowResolution = {1280, 720},
 
-		.fx_chromaticOffset = 0.002f,
+		.fx_chromaticOffset = 0.000f,
 
 		.fx_quantization = false,
 		.fx_quantizationLevel = 4,

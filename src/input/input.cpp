@@ -72,12 +72,21 @@ namespace Input {
 		return g_textBuffer;
 	}
 
-	bool IsKeyDown(uint16_t key) {
-		return key < 350 ? g_keydownmap[key] : false;
+	// bool IsKeyDown(uint16_t key) {
+	// 	return key < 350 ? g_keydownmap[key] : false;
+	// }
+
+	bool IsKeyDown(Key key) {
+		return g_keydownmap[static_cast<uint16_t>(key)];
 	}
 
-	bool IsKeyPressed(uint16_t key) {
-		return key < 350 ? g_keypressedmap[key] : false;
+
+	// bool IsKeyPressed(uint16_t key) {
+	// 	return key < 350 ? g_keypressedmap[key] : false;
+	// }
+
+	bool IsKeyPressed(Key key) {
+		return g_keypressedmap[static_cast<uint16_t>(key)];
 	}
 
 	bool IsLeftMouseDown() {
