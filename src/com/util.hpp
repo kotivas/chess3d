@@ -1,5 +1,6 @@
 #pragma once
 #include <optional>
+#include <sstream>
 #include <string>
 
 #include "../render/model.hpp"
@@ -7,7 +8,14 @@
 
 namespace Util {
 	template <typename T, size_t N>
-	std::string array_to_string(const std::array<T, N>& arr);
+	std::string array_to_string(const std::array<T, N>& arr) {
+		std::ostringstream oss;
+		for (size_t i = 0; i < N; ++i) {
+			oss << arr[i];
+			if (i != N - 1) oss << ", ";
+		}
+		return oss.str();
+	}
 
 	std::string trim(const std::string& s);
 	std::vector<float> ParseFloatList(const std::string& str);

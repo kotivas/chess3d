@@ -109,7 +109,7 @@ namespace CMDUtils {
 			} else if constexpr (std::is_arithmetic_v<T>) {
 				return std::to_string(arg);
 			} else if constexpr (std::is_same_v<T, std::array<float, 2>> || std::is_same_v<T, std::array<float, 3>> || std::is_same_v<T, std::array<float, 4>>) {
-				// return Util::array_to_string(arg);
+				return Util::array_to_string(arg);
 				return "VEC";
 			} else {
 				Log::Warning("Unable to parse cvar value as string");

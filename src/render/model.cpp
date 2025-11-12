@@ -123,7 +123,7 @@ namespace Render {
 				return mesh;
 			}
 		}
-		Log::Warning("No mesh with name " + name + " in model " + this->name);
+		Log::Warning("No mesh with name {0} in model {1}", name, this->name);
 		return nullptr;
 	}
 

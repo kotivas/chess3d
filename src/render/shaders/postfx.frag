@@ -9,7 +9,7 @@ struct Effects {
     bool vignette;
     float vignetteIntensity;
     vec3 vignetteColor;
-    float chromaticOffset;// ~0.002..0.01
+    float chromaticOffset;
 };
 
 uniform sampler2D screenTexture;
@@ -42,8 +42,7 @@ vec3 quantizeColor(vec3 color, int levels) {
 void main() {
     vec3 color = texture(screenTexture, TexCoords).rgb;
     vec2 screenDir = (TexCoords - 0.5) * 2.0;
-    color = sampleChromatic(TexCoords, screenDir, effects.chromaticOffset * 0.2);
-    // optional post effects
+    if (effects.chromaticOffset > 0) color = sampleChromatic(TexCoords, screenDir, effects.chromaticOffset * 0.2);
     if (effects.quantization) color = quantizeColor(color, effects.quantizationLevel);
     if (effects.vignette) color = applyVignette(color);
 

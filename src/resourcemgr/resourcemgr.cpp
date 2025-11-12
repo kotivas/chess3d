@@ -1,16 +1,14 @@
 #include "resourcemgr.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-#include "../com/util.hpp"
-#include <glad/glad.h>
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <rapidjson/document.h>
-#include <rapidjson/filereadstream.h>
-#include <rapidjson/istreamwrapper.h>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
+#include <stb_image.h>
+#include <assimp/Importer.hpp>
+#include <glad/glad.h>
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
+#include "../com/util.hpp"
 
 #include "core/logger.hpp"
 
@@ -53,7 +51,7 @@ namespace ResourceMgr {
 		unsigned char* data = stbi_load(pngPath.c_str(), &w, &h, &channels, 0);
 
 		if (!data) {
-			Log::Error("[MSDF] Failed to load texture: " + pngPath + " WHY: " + stbi_failure_reason());
+			Log::Error("LoadMSDFFont: Failed to load image: " + pngPath + " WHY: " + stbi_failure_reason());
 			return;
 		}
 
@@ -84,7 +82,7 @@ namespace ResourceMgr {
 		// FILE* fp = fopen(jsonPath.c_str(), "rb");
 		std::ifstream jsonfile(jsonPath);
 		if (!jsonfile.is_open()) {
-			Log::Error("[MSDF] Failed to open JSON: " + jsonPath + " WHY: " + std::to_string(jsonfile.rdstate()));
+			Log::Error("LoadMSDFFont: Failed to open JSON: " + jsonPath + " WHY: " + std::to_string(jsonfile.rdstate()));
 			return;
 		}
 
@@ -93,13 +91,13 @@ namespace ResourceMgr {
 		doc.ParseStream(isw);
 
 		if (!doc.IsObject()) {
-			Log::Error("[MSDF] Invalid JSON format in: " + jsonPath);
+			Log::Error("LoadMSDFFont: Invalid JSON format in: " + jsonPath);
 			return;
 		}
 
 		// --- Parse atlas info ---
 		if (!doc.HasMember("atlas") || !doc["atlas"].IsObject()) {
-			Log::Error("[MSDF] Missing atlas section in metadata in " + jsonPath);
+			Log::Error("LoadMSDFFont: Missing atlas section in metadata in " + jsonPath);
 			return;
 		}
 
@@ -150,10 +148,7 @@ namespace ResourceMgr {
 			font->glyphs[glyph.codepoint] = glyph;
 		}
 
-		Log::Debug(
-			"MSDF Font loaded: " + pngPath + " (" + std::to_string(font->glyphs.size()) + " glyphs " +
-			std::to_string(w) + "x" +
-			std::to_string(h) + " atlas)");
+		Log::Debug("MSDF Font loaded: {0} ({1}x{2})", pngPath, w, h);
 
 		// return font;
 		g_fonts.insert({name, font});
@@ -223,7 +218,7 @@ namespace ResourceMgr {
 		stbi_image_free(image);
 		glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
 
-		Log::Debug("Texture loaded: " + path);
+		Log::Debug("Texture loaded: {}", path);
 
 		return textureLoc;
 	}
