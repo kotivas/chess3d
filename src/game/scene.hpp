@@ -7,7 +7,7 @@
 
 struct Scene {
 	std::vector<Render::DrawableObjectPtr> objects;
-	Camera camera;
+	Camera::Camera camera;
 
 	DirLight dirLight;
 	PointLight pointLight; // later vector

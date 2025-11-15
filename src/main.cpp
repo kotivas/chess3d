@@ -17,26 +17,10 @@
 #include "core/cmdutils.hpp"
 #include "core/cvar.hpp"
 #include "core/logger.hpp"
+#include "game/cameracontroller.hpp"
 
 // TODO make it json or smth
 static Scene scene{
-	.camera{
-		.position = {0, 0, 0},
-		.target = {0, 17, 0},
-
-		.radius = 30.f,
-
-		.yaw = 90.f,
-		.pitch = 45.f,
-
-		.lastx = 400,
-		.lasty = 300,
-
-		.sens = 0.2f,
-		.fov = 45.f,
-
-		.locked = true
-	},
 	.dirLight{
 		.enable = true,
 		.direction = {-0.5f, -0.2f, -1.f},
@@ -76,8 +60,6 @@ static Scene scene{
 	}
 };
 
-static bool g_isFlashlight = false;
-
 void SaveScreenshot(const char* filename) {
 	// Выделение памяти под пиксели (формат
 	std::vector<unsigned char> pixels(g_config.sys_windowResolution.x * g_config.sys_windowResolution.y * 3);
@@ -109,25 +91,10 @@ void SaveScreenshot(const char* filename) {
 }
 
 void updateControls() {
-	if (Input::IsKeyPressed(Key::Escape)) {
-		glfwSetWindowShouldClose(Renderer::g_window, GL_TRUE);
-	} else if (Input::IsKeyPressed(Key::F11)) {
-		SaveScreenshot("frame.png");
-	} else if (Input::IsKeyPressed(Key::F) && !Console::IsVisible()) {
-		g_isFlashlight = !g_isFlashlight;
-		Log::Debug("Flashlight: " + std::string(g_isFlashlight ? "on" : "off"));
-		scene.spotLight.enable = g_isFlashlight;
-	} else if (Input::IsKeyPressed(Key::P) && !Console::IsVisible()) {
-		scene.pointLight.enable = !scene.pointLight.enable;
-	}
-
+	if (Input::IsKeyPressed(Key::Escape) && Console::IsVisible()) Console::Toggle();
 	if (Input::IsKeyPressed(Key::GraveAccent)) Console::Toggle();
-
-	if (Input::IsRightMouseDown()) {
-		scene.camera.locked = false;
-	} else {
-		scene.camera.locked = true;
-	}
+	if (Input::IsKeyPressed(Key::F11)) SaveScreenshot("frame.png");
+	if (Input::IsKeyPressed(Key::P) && !Console::IsVisible()) scene.pointLight.enable = !scene.pointLight.enable;
 
 	if (Input::g_resizedHeight || Input::g_resizedWidth) {
 		if (Input::g_resizedWidth == 0 && Input::g_resizedHeight == 0) return; // in case of minimizing
@@ -136,9 +103,6 @@ void updateControls() {
 		// Renderer::UpdateRenderRes();
 		glViewport(0, 0, Input::g_resizedWidth, Input::g_resizedHeight);
 	}
-
-	scene.camera.mouseMoved(Input::GetMouseX(), Input::GetMouseY());
-	if (!Console::IsVisible()) scene.camera.mouseScrolled(Input::GetScrollYOffset(), g_config.r_renderDistance);
 }
 
 void setupScene() {
@@ -153,12 +117,6 @@ void setupScene() {
 	Render::ModelPtr desk = ResourceMgr::GetModelByName("desk");
 	desk->transform.scale = {20, 20, 20};
 	scene.objects.push_back(desk);
-
-	Render::MeshPtr floor = Util::CreatePlaneMesh(8, "floor_plane");
-	floor->transform.scale = glm::vec3(g_config.r_renderDistance);
-	floor->material->shader = ResourceMgr::GetShaderByName("scene");
-	floor->castShadow = false;
-	scene.objects.push_back(floor);
 }
 
 void LoadAll() {
@@ -182,13 +140,12 @@ void LoadAll() {
 }
 
 void RegisterCVars() {
+	CMDUtils::Register("sensitivity", "Mouse responsivity (Float)", g_config.sensitivity, 0, 10);
+
 	// --- Camera ---
 	CMDUtils::Register("cam_position", "Camera position (Vec3f)", scene.camera.position);
-	CMDUtils::Register("cam_target", "Camera target (Vec3f)", scene.camera.target);
-	CMDUtils::Register("cam_radius", "Camera radius (Float)", scene.camera.radius, 0.f, 1000.f);
 	CMDUtils::Register("cam_yaw", "Camera yaw (Float)", scene.camera.yaw, -360.f, 360.f);
 	CMDUtils::Register("cam_pitch", "Camera pitch (Float)", scene.camera.pitch, -90.f, 90.f);
-	CMDUtils::Register("cam_sens", "Camera sensitivity (Float)", scene.camera.sens, 0.f, 5.f);
 	CMDUtils::Register("cam_fov", "Camera FOV (Float)", scene.camera.fov, 1.f, 180.f);
 
 	CMDUtils::Register("dir_enable", "Directional light enabled (Boolean)", scene.dirLight.enable);
@@ -265,6 +222,8 @@ void RegisterCVars() {
 
 int main(int argc, char** argv) {
 	g_config = {
+		.sensitivity = 0.1f,
+
 		.sys_windowResolution = {1280, 720},
 
 		.fx_chromaticOffset = 0.000f,
@@ -286,8 +245,12 @@ int main(int argc, char** argv) {
 		.con_maxVisibleLines = 20,
 		.con_backgroundColor = {0, 0, 0, 0.9},
 	};
+
+	scene.camera = Camera::Camera(60, glm::vec3(0, 17, 0), 0.1, g_config.r_renderDistance);
+
 	Log::Init();
 	Log::SetSeverity(Logger::Severity::Debug);
+	Camera::FPSCameraController cameraController(0.1);
 
 	Renderer::Init();
 	LoadAll();
@@ -299,6 +262,9 @@ int main(int argc, char** argv) {
 
 	// TODO make loading screen w/ progresbar
 	setupScene();
+	// if (glfwRawMouseMotionSupported())
+	// glfwSetInputMode(Renderer::g_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
 	double lastTime = glfwGetTime();
 	int fps = 0;
 	double timer = 0;
@@ -312,14 +278,10 @@ int main(int argc, char** argv) {
 		}
 
 		lastTime = glfwGetTime();
-		if (g_isFlashlight) {
-			scene.spotLight.position = scene.camera.position;
-			scene.spotLight.position.y -= 2;
-			scene.spotLight.direction = glm::normalize(scene.camera.target - scene.camera.position);
-		}
 
 		// UPDATE
-		scene.camera.updatePosition();
+		cameraController.update(scene.camera, dt);
+		cameraController.handleControls(scene.camera);
 		updateControls();
 		Console::Update(dt);
 		Input::PollEvents(); // always should be updated last

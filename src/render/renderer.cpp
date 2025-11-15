@@ -282,11 +282,8 @@ namespace Renderer {
 
 		UpdateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
 		UpdateUBOData(scene.camera.position);
-		UpdateUBOMatrices(
-			glm::perspective(glm::radians(scene.camera.fov),
-			                 (float)g_config.sys_windowResolution.x / (float)g_config.sys_windowResolution.y,
-			                 0.1f, g_config.r_renderDistance), scene.camera.getViewMatrix(),
-			dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix
+		UpdateUBOMatrices(scene.camera.projectionMatrix, scene.camera.viewMatrix,
+		                  dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix
 		);
 
 		glActiveTexture(GL_TEXTURE0);

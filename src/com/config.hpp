@@ -6,6 +6,9 @@
 #include "color.hpp"
 
 struct Config {
+	// -- NO PREFIX ---
+	float sensitivity;
+
 	// --- SYSTEM ---
 	glm::ivec2 sys_windowResolution;
 

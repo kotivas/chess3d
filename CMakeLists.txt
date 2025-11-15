@@ -19,7 +19,6 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 
 set(SOURCE 
 		src/main.cpp
-		src/game/camera.cpp
 		src/render/shader.cpp
 		src/render/renderer.cpp
 		src/render/model.cpp
@@ -40,6 +39,8 @@ set(SOURCE
 		src/core/cvar.hpp
 		src/core/backend.cpp
 		src/core/backend.hpp
+		src/game/cameracontroller.cpp
+		src/game/cameracontroller.hpp
 )
 
 add_executable(chess3d ${SOURCE} )

@@ -1,24 +1,31 @@
 #pragma once
+#include <glm/vec3.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+namespace Camera {
+	struct Camera {
+		Camera(float fov = 45.f, glm::vec3 position = {0, 0, 0},
+		       float znear = 0.1, float zfar = 100)
+			: position(position), yaw(0), pitch(0), fov(fov), nearPlane(znear), farPlane(zfar), forward(0, 0, 1),
+			  up(0, 1, 0) {}
 
-struct Camera {
-	void mouseScrolled(double offset, float max_radius);
-	void mouseMoved(double xpos, double ypos);
-	void updatePosition();
+		glm::vec3 position;
+		float yaw;
+		float pitch;
+		float fov;
 
-	[[nodiscard]] inline glm::mat4 getViewMatrix() const {
-		return glm::lookAt(position, target, glm::vec3(0.0f, 1.0f, 0.0f));
-	}
+		float nearPlane;
+		float farPlane;
 
-	glm::vec3 position; // позиция камеры в пространстве
-	glm::vec3 target; // точка в пространстве, вокруг которой вращается камера
-	float radius; // Расстояние от камеры до точки target.
-	float yaw, pitch;
-	float lastx, lasty; // Последние координаты мыши
-	float sens;
-	float fov;
+		glm::mat4 viewMatrix;
+		glm::mat4 projectionMatrix;
+		glm::vec3 forward;
+		glm::vec3 up;
+		// right = glm::cross(forward, up)
 
-	bool locked;
-};
+		void calcProjMat(const float res_x, const float res_y) {
+			projectionMatrix = glm::perspective(glm::radians(fov), res_x / res_y, nearPlane, farPlane);
+		}
+	};
+}
