@@ -19,28 +19,30 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 
 set(SOURCE 
 		src/main.cpp
-		src/render/shader.cpp
-		src/render/renderer.cpp
-		src/render/model.cpp
-		src/game/game.cpp
- 		src/resourcemgr/resourcemgr.cpp
-		src/com/util.hpp
-		src/com/util.cpp
-		src/render/shadow.cpp
-		src/com/config.cpp
-		src/input/input.cpp
-		src/console/console.cpp
-		src/text/MSDFText.cpp
-		src/resourcemgr/resourcemgr_model.cpp
-		src/resourcemgr/resourcemgr_shader.cpp
-		src/core/logger.cpp
-		src/core/cmdutils.cpp
-		src/core/cmdutils.hpp
-		src/core/cvar.hpp
-		src/core/backend.cpp
-		src/core/backend.hpp
-		src/game/cameracontroller.cpp
-		src/game/cameracontroller.hpp
+
+		src/Common/Utils.cpp
+		src/Common/Config.cpp
+
+		src/Renderer/Shader.cpp
+		src/Renderer/Renderer.cpp
+		src/Renderer/Model.cpp
+		src/Renderer/Shadow.cpp
+		src/Renderer/PostEffects/GaussianBlur.cpp
+
+		src/Game/Game.cpp
+		src/Game/CameraController.cpp
+
+		src/Input/Input.cpp
+        src/UI/Console/Console.cpp
+        src/UI/Text/MSDFText.cpp
+
+		src/ResourceMgr/ResourceMgr.cpp
+		src/ResourceMgr/ResourceMgrModel.cpp
+		src/ResourceMgr/ResourceMgrShader.cpp
+
+		src/Core/Logger.cpp
+		src/Core/CMDUtils.cpp
+		src/Core/Backend.cpp
 )
 
 add_executable(chess3d ${SOURCE} )
@@ -53,8 +55,8 @@ add_custom_command(
 add_custom_command(
 	TARGET chess3d POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_directory
-	"${CMAKE_SOURCE_DIR}/src/render/shaders"
-	"${CMAKE_BINARY_DIR}/shaders" )
+	"${CMAKE_SOURCE_DIR}/src/Renderer/Shaders"
+	"${CMAKE_BINARY_DIR}/Shaders" )
 
 target_include_directories(chess3d PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(chess3d PRIVATE OpenGL::GL glad::glad glfw glm::glm assimp::assimp rapidjson)

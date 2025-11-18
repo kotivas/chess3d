@@ -2,45 +2,43 @@
 #include <algorithm>
 #include <array>
 #include <string>
-#include "com/config.hpp"
-#include "game/scene.hpp"
-#include "render/model.hpp"
-#include "render/renderer.hpp"
-#include "resourcemgr/resourcemgr.hpp"
+#include "Common/Config.hpp"
+#include "Game/Scene.hpp"
+#include "Renderer/Model.hpp"
+#include "Renderer/Renderer.hpp"
+#include "ResourceMgr/ResourceMgr.hpp"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "./input/input.hpp"
+#include "./Input/Input.hpp"
 #include "stb_image_write.h"
-#include "./text/MSDFText.hpp"
-#include "com/util.hpp"
-#include "console/console.hpp"
-#include "core/backend.hpp"
-#include "core/cmdutils.hpp"
-#include "core/cvar.hpp"
-#include "core/logger.hpp"
-#include "game/cameracontroller.hpp"
+#include "Ui/Text/MSDFText.hpp"
+#include "Common/Utils.hpp"
+#include "Ui/Console/Console.hpp"
+#include "Core/Backend.hpp"
+#include "Core/CMDUtils.hpp"
+#include "Core/CVar.hpp"
+#include "Core/Logger.hpp"
+#include "Game/CameraController.hpp"
 
 // TODO make it json or smth
 static Scene scene{
 	.dirLight{
 		.enable = true,
 		.direction = {-0.5f, -0.2f, -1.f},
-		.ambient = glm::vec3(0.3f),
-		.diffuse = glm::vec3(0.8f),
-		.specular = glm::vec3(0.5f)
+		.ambient = glm::vec3(0),
+		.diffuse = glm::vec3(0.1, 0.1, 0.4),
+		.specular = glm::vec3(0.1f)
 	},
 	.pointLight{
-		.enable = false,
-		.position = {0.f, 35.f, 0.f},
+		.enable = true,
+		.position = {0.f, 20.f, 0.f},
 
 		.constant = 1.f,
-		// .linear = 0.09f,
-		// .quadratic = 0.032f,
-		.linear = 0,
-		.quadratic = 0.004f,
+		.linear = 0.05f,
+		.quadratic = 0.01f,
 
-		.ambient = {0.8f, 0.8f, 1.f},
-		.diffuse = {0.6f, 0.6f, 1.f},
-		.specular = {1.f, 1.f, 1.f},
+		.ambient = {1.0f, 1.0f, 1.0f}, // Темно-оранжевый
+		.diffuse = {1.0f, 1.5f, 1.0f}, // Оранжевый
+		.specular = {1.f, 1.f, 1.f}
 	},
 	.spotLight{
 		.enable = false,
@@ -106,7 +104,17 @@ void updateControls() {
 }
 
 void setupScene() {
-	Render::ModelPtr toy = ResourceMgr::GetModelByName("slayer_toy");
+	Renderer::MeshPtr cube = Utils::CreateCubeMesh("lightcube", 100);
+	cube->transform = {
+		.position = glm::vec3(0),
+		.rotation = glm::vec3(0),
+		.scale = glm::vec3(.25f),
+	};
+	cube->material->shader = ResourceMgr::GetShaderByName("LightCube");
+	// cube->castShadow = false;
+	scene.objects.push_back(cube);
+
+	Renderer::ModelPtr toy = ResourceMgr::GetModelByName("slayer_toy");
 	toy->transform = {
 		.position = {-5, 16, 0},
 		.rotation = {-90, 0, -45},
@@ -114,7 +122,7 @@ void setupScene() {
 	};
 	scene.objects.push_back(toy);
 
-	Render::ModelPtr desk = ResourceMgr::GetModelByName("desk");
+	Renderer::ModelPtr desk = ResourceMgr::GetModelByName("desk");
 	desk->transform.scale = {20, 20, 20};
 	scene.objects.push_back(desk);
 }
@@ -123,20 +131,22 @@ void LoadAll() {
 	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata_light.png",
 	                          "assets/fonts/inconsolata_light.json");
 	// ALL SHADERS
-	ResourceMgr::LoadShader("postfx", "shaders/postfx.vert",
-	                        "shaders/postfx.frag");
-	ResourceMgr::LoadShader("depth", "shaders/depth.vert",
-	                        "shaders/depth.frag");
-	ResourceMgr::LoadShader("point_shadow_depth", "shaders/point_shadow_depth.vert", "shaders/point_shadow_depth.frag",
-	                        "shaders/point_shadow_depth.geom");
-	ResourceMgr::LoadShader("msdf_text", "shaders/msdf_text.vert", "shaders/msdf_text.frag");
-	ResourceMgr::LoadShader("scene", "shaders/scene.vert", "shaders/scene.frag");
-	ResourceMgr::LoadShader("solidcolor", "shaders/solidcolor.vert", "shaders/solidcolor.frag");
+	ResourceMgr::LoadShader("screenfbo", "Shaders/PostEffects/PostFX.vert", "Shaders/2DTexture.frag");
+	ResourceMgr::LoadShader("GaussianBlur", "Shaders/PostEffects/GaussianBlur.vert",
+	                        "Shaders/PostEffects/GaussianBlur.frag");
+	ResourceMgr::LoadShader("postfx", "Shaders/PostEffects/PostFX.vert", "Shaders/PostEffects/PostFX.frag");
+	ResourceMgr::LoadShader("depth", "Shaders/Depth.vert", "Shaders/Depth.frag");
+	ResourceMgr::LoadShader("LightCube", "Shaders/Light.vert", "Shaders/Light.frag");
+	ResourceMgr::LoadShader("solidcolor", "Shaders/2DColor.vert", "Shaders/2DColor.frag");
+	ResourceMgr::LoadShader("LightingShader", "Shaders/LightingShader.vert", "Shaders/LightingShader.frag");
+	ResourceMgr::LoadShader("msdf_text", "Shaders/MSDFText.vert", "Shaders/MSDFText.frag");
+	ResourceMgr::LoadShader("point_shadow_depth", "Shaders/point_shadow_depth.vert", "Shaders/point_shadow_depth.frag",
+	                        "Shaders/point_shadow_depth.geom");
 
 	// ALL MODELS
 
-	ResourceMgr::LoadModel("slayer_toy", "assets/models/slayer_toy.obj", ResourceMgr::GetShaderByName("scene"));
-	ResourceMgr::LoadModel("desk", "assets/models/desk.obj", ResourceMgr::GetShaderByName("scene"));
+	ResourceMgr::LoadModel("slayer_toy", "assets/models/slayer_toy.obj", ResourceMgr::GetShaderByName("LightingShader"));
+	ResourceMgr::LoadModel("desk", "assets/models/desk.obj", ResourceMgr::GetShaderByName("LightingShader"));
 }
 
 void RegisterCVars() {
@@ -177,11 +187,12 @@ void RegisterCVars() {
 
 
 	// --- Rendering ---
+	CMDUtils::Register("r_blurPasses", "Number of bloom blur passes", g_config.r_blurPasses, 0.f, 50.f);
 	CMDUtils::Register("r_gamma", "Adjusts screen gamma correction (Float)", g_config.r_gamma, 0.f, 4.f);
 	CMDUtils::Register("r_shadowRes", "Shadow map resolution (Integer)", g_config.r_shadowRes, 512.f, 8192.f);
 	CMDUtils::Register("r_renderDistance", "Maximum render distance (Float)", g_config.r_renderDistance, 100.f,
 	                   5000.f);
-	CMDUtils::Register("r_vsync", "Vertical synchronization (1 = on, 0 = off) (Boolean)", g_config.r_vsync);
+	CMDUtils::Register("r_vsync", "Vertical synchronization (Boolean)", g_config.r_vsync);
 	CMDUtils::Register(CVar::cvar_t(
 		"r_fillColor", static_cast<std::array<float, 3>>(g_config.r_fillColor),
 		[](const CVar::cvar_t& cvar) {
@@ -202,13 +213,19 @@ void RegisterCVars() {
 		"Console background color (RGBA)"
 	));
 	// --- Post-processing / Effects ---
+	CMDUtils::Register("fx_bloom", "Enable bloom effect (Boolean)", g_config.fx_bloom);
 	CMDUtils::Register("fx_chromaticOffset", "Strength of chromatic abberation", g_config.fx_chromaticOffset);
-
-	CMDUtils::Register("fx_quantization", "Enable color quantization (1 = on, 0 = off) (Boolean)",
+	CMDUtils::Register("fx_exposure", "Exposure (Float)", g_config.fx_exposure, 0.1, 10);
+	CMDUtils::Register("fx_autoExposureSpeed", "Speed of automatic exposure (Float)", g_config.fx_autoExposureSpeed,
+	                   0.f, 1.f);
+	CMDUtils::Register("fx_autoExposure",
+	                   "Automatic adjustment of scene exposure to simulate eye adaptation from changes in brightness (Boolean)",
+	                   g_config.fx_autoExposure);
+	CMDUtils::Register("fx_quantization", "Enable color quantization (Boolean)",
 	                   g_config.fx_quantization);
 	CMDUtils::Register("fx_quantizationLevel", "Color quantization level (Integer)", g_config.fx_quantizationLevel, 2.f,
 	                   16.f);
-	CMDUtils::Register("fx_vignette", "Enable vignette effect (1 = on, 0 = off) (Boolean)", g_config.fx_vignette);
+	CMDUtils::Register("fx_vignette", "Enable vignette effect (Boolean)", g_config.fx_vignette);
 	CMDUtils::Register("fx_vignetteIntensity", "Vignette intensity (Float)", g_config.fx_vignetteIntensity, 0.f, 1.f);
 	CMDUtils::Register(CVar::cvar_t(
 		"fx_vignetteColor",
@@ -226,20 +243,26 @@ int main(int argc, char** argv) {
 
 		.sys_windowResolution = {1280, 720},
 
+		.fx_bloom = true,
 		.fx_chromaticOffset = 0.000f,
-
 		.fx_quantization = false,
 		.fx_quantizationLevel = 4,
 		.fx_vignette = true,
 		.fx_vignetteIntensity = 0.25f,
+
+		.fx_exposure = 1.f,
+		.fx_autoExposure = true,
+		.fx_autoExposureSpeed = 0.02f,
+
 		.fx_vignetteColor = {0, 0, 0},
 
+		.r_blurPasses = 5,
 		.r_gamma = 2.2,
 		.r_resolution = {2560, 1440}, // 2x sampling
 		.r_shadowRes = 2048,
 		.r_renderDistance = 1000.f,
 		.r_vsync = false,
-		.r_fillColor = {0.3, 0.3, 0.3},
+		.r_fillColor = {0, 0, 0},
 
 		.con_fontScale = 32,
 		.con_maxVisibleLines = 20,
@@ -249,8 +272,9 @@ int main(int argc, char** argv) {
 	scene.camera = Camera::Camera(60, glm::vec3(0, 17, 0), 0.1, g_config.r_renderDistance);
 
 	Log::Init();
-	Log::SetSeverity(Logger::Severity::Debug);
-	Camera::FPSCameraController cameraController(0.1);
+	Log::SetSeverity(Logger::Severity::Info);
+	Camera::FPSCameraController cameraController(0.1f);
+
 
 	Renderer::Init();
 	LoadAll();
@@ -262,8 +286,6 @@ int main(int argc, char** argv) {
 
 	// TODO make loading screen w/ progresbar
 	setupScene();
-	// if (glfwRawMouseMotionSupported())
-	// glfwSetInputMode(Renderer::g_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
 	double lastTime = glfwGetTime();
 	int fps = 0;
@@ -289,12 +311,21 @@ int main(int argc, char** argv) {
 		// RENDER
 		Renderer::GenShadowMaps(scene);
 		Renderer::FrameBegin(scene);
-		for (const auto& object : scene.objects) object->draw({});
-		Console::Draw();
+		for (const auto& object : scene.objects) {
+			if (object->name == "lightcube") object->transform.position = scene.pointLight.position;
+			object->draw();
+		}
+
+		Renderer::ApplyPostProcess(dt);
 		MSDFText::DrawText(std::to_string(fps), ResourceMgr::GetFontByName("inconsolata_light"),
 		                   g_config.r_resolution.x - 60,
 		                   g_config.r_resolution.y - 32, 32,
 		                   {Color::WHITE, 1});
+		MSDFText::DrawText(std::to_string(g_config.fx_exposure), ResourceMgr::GetFontByName("inconsolata_light"),
+		                   g_config.r_resolution.x - 60,
+		                   g_config.r_resolution.y - 64, 32,
+		                   {Color::WHITE, 1});
+		Console::Draw();
 		Renderer::FrameEnd();
 	}
 	Renderer::Shutdown();

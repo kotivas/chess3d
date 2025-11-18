@@ -1,0 +1,486 @@
+#include "Renderer.hpp"
+
+#include "Common/Utils.hpp"
+#include "Common/Config.hpp"
+#include "Core/Logger.hpp"
+#include "PostEffects/PostEffects.hpp"
+#include "ResourceMgr/ResourceMgr.hpp"
+
+namespace Renderer {
+	void Init() {
+		sceneFBO = 0;
+		RBO = 0;
+		UBOMatrices = 0;
+		quadVAO = 0;
+		quadVBO = 0;
+		sceneColorBufs[0] = 0;
+		sceneColorBufs[1] = 0;
+		screenColorBuf = 0;
+		screenFBO = 0;
+
+		InitGLFW();
+
+		int flags;
+		glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+		if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+			glEnable(GL_DEBUG_OUTPUT);
+			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+			glDebugMessageCallback(Utils::glDebugOutput, nullptr);
+		}
+
+		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
+
+		glEnable(GL_DEPTH_TEST);
+
+		glEnable(GL_CULL_FACE); // Включаем отсечение задних граней
+		glCullFace(GL_BACK); // Указываем, какие грани отсекать (задние)
+		glFrontFace(GL_CCW); // Указываем порядок вершин для лицевых граней (CCW по умолчанию)
+
+		// work with shadows
+		pointShadow.resolution = g_config.r_shadowRes;
+		pointShadow.generate();
+
+		spotShadow.resolution = g_config.r_shadowRes; // todo maybe i should split it
+		spotShadow.generate();
+
+		dirShadow.resolution = g_config.r_shadowRes;
+		dirShadow.generate();
+
+		CreateSceneFBO();
+		CreateScreenFBO();
+		CreateQuadVAO();
+		CreateUBO();
+
+		blur.init(g_config.r_resolution.x, g_config.r_resolution.y, quadVAO, quadVBO);
+	}
+
+
+	void InitGLFW() {
+		// Init GLFW
+		glfwInit();
+		// Set all the required options for GLFW
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+		//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
+		g_window = glfwCreateWindow(g_config.sys_windowResolution.x, g_config.sys_windowResolution.y, "chess3d",
+		                            nullptr, nullptr);
+
+		glfwMakeContextCurrent(g_window);
+		glfwSwapInterval(g_config.r_vsync); // vsync 1 - on; 0 - off
+
+		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+	}
+
+	void CreateScreenFBO() {
+		glGenFramebuffers(1, &screenFBO);
+		glBindFramebuffer(GL_FRAMEBUFFER, screenFBO);
+
+		glGenTextures(1, &screenColorBuf);
+
+		glBindTexture(GL_TEXTURE_2D, screenColorBuf);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+		             GL_FLOAT, NULL);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenColorBuf, 0);
+	}
+
+	void CreateSceneFBO() {
+		glGenFramebuffers(1, &sceneFBO);
+		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+		// create a color attachment texture
+
+		glGenTextures(2, sceneColorBufs);
+		for (int i = 0; i < 2; i++) {
+			glBindTexture(GL_TEXTURE_2D, sceneColorBufs[i]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+			             GL_FLOAT, NULL);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, sceneColorBufs[i], 0);
+		}
+
+		// create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+		glGenRenderbuffers(1, &RBO);
+		glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.r_resolution.x,
+		                      g_config.r_resolution.y);
+		// use a single renderbuffer object for both a depth AND stencil buffer.
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
+
+		unsigned int attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+		glDrawBuffers(2, attachments);
+
+		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	void CreateQuadVAO() {
+		// Вершины квадрата
+		float quadVertices[] = {
+			// vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+			// positions   // texCoords
+			-1.0f, 1.0f, 0.0f, 1.0f,
+			-1.0f, -1.0f, 0.0f, 0.0f,
+			1.0f, -1.0f, 1.0f, 0.0f,
+
+			-1.0f, 1.0f, 0.0f, 1.0f,
+			1.0f, -1.0f, 1.0f, 0.0f,
+			1.0f, 1.0f, 1.0f, 1.0f
+		};
+
+		glGenVertexArrays(1, &quadVAO);
+		glGenBuffers(1, &quadVBO);
+		glBindVertexArray(quadVAO);
+		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+	}
+
+	void CreateUBO() {
+		// ====== MATRICES ======
+		glGenBuffers(1, &UBOMatrices);
+
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
+		glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, 4 * sizeof(glm::mat4));
+		// ====== LIGHTS ======
+		glGenBuffers(1, &UBOLights);
+
+		static_assert(sizeof(DirLight) == 80);
+		static_assert(sizeof(PointLight) == 96);
+		static_assert(sizeof(SpotLight) == 112);
+
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(DirLight) + sizeof(PointLight) + sizeof(SpotLight), NULL,
+		             GL_STATIC_DRAW);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+		glBindBufferRange(GL_UNIFORM_BUFFER, 1, UBOLights, 0,
+		                  sizeof(DirLight) + sizeof(PointLight) + sizeof(SpotLight));
+		// ====== DATA ======
+		glGenBuffers(1, &UBOData);
+
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOData);
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec3) + sizeof(float), NULL, GL_STATIC_DRAW);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+		glBindBufferRange(GL_UNIFORM_BUFFER, 2, UBOData, 0, sizeof(glm::vec3) + sizeof(float));
+	}
+
+	void RenderClear() {
+		glClearColor(g_config.r_fillColor.r, g_config.r_fillColor.g, g_config.r_fillColor.b, 1.0f);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, screenFBO);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	void UpdateUBOMatrices(const glm::mat4& projection, const glm::mat4& view,
+	                       const glm::mat4& dirLightSpaceMatrix, const glm::mat4& spotLightSpaceMatrix) {
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
+
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4),
+		                glm::value_ptr(dirLightSpaceMatrix));
+		glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), sizeof(glm::mat4),
+		                glm::value_ptr(spotLightSpaceMatrix));
+
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
+
+	void UpdateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight) {
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
+
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(DirLight), &dirLight);
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(DirLight), sizeof(PointLight), &pointLight);
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(DirLight) + sizeof(PointLight), sizeof(spotLight), &spotLight);
+
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
+
+	void UpdateUBOData(const glm::vec3& viewPos) {
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOData);
+
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(viewPos), glm::value_ptr(viewPos));
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec3), sizeof(float), &g_config.r_renderDistance);
+
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
+
+	void GenShadowMaps(Scene& scene) {
+		glCullFace(GL_FRONT);
+
+		// light space matrix for directional light
+
+		if (scene.dirLight.enable) {
+			dirShadow.calculateLightSpaceMatrix(scene.dirLight.direction, 0.1f, g_config.r_renderDistance);
+
+			// render scene from light's point of view
+			glViewport(0, 0, dirShadow.resolution, dirShadow.resolution);
+			glBindFramebuffer(GL_FRAMEBUFFER, dirShadow.shadowMapFBO);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			ResourceMgr::GetShaderByName("depth")->use();
+			ResourceMgr::GetShaderByName("depth")->setUniformMat4fv("u_LightSpaceMatrix", false,
+			                                                        dirShadow.lightSpaceMatrix);
+
+			for (auto& object : scene.objects) {
+				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("depth"));
+			}
+		}
+		if (scene.spotLight.enable) {
+			spotShadow.calculateLightSpaceMatrix(scene.spotLight.position, scene.spotLight.direction,
+			                                     scene.spotLight.outerCutOff, 0.1f, g_config.r_renderDistance);
+
+			// render scene from light's point of view
+			glViewport(0, 0, spotShadow.resolution, spotShadow.resolution);
+			glBindFramebuffer(GL_FRAMEBUFFER, spotShadow.shadowMapFBO);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			ResourceMgr::GetShaderByName("depth")->use();
+			ResourceMgr::GetShaderByName("depth")->setUniformMat4fv("u_LightSpaceMatrix", false,
+			                                                        spotShadow.lightSpaceMatrix);
+
+			for (auto& object : scene.objects) {
+				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("depth"));
+			}
+		}
+		if (scene.pointLight.enable) {
+			pointShadow.genTransformMatrixes(scene.pointLight.position, scene.camera.nearPlane, scene.camera.farPlane);
+
+			// render scene from light's point of view
+			glViewport(0, 0, pointShadow.resolution, pointShadow.resolution);
+			glBindFramebuffer(GL_FRAMEBUFFER, pointShadow.shadowCubemapFBO);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			ResourceMgr::GetShaderByName("point_shadow_depth")->use();
+
+			// TODO возможно я могу как то сделать, что бы за раз передавать 6 матриц
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[0]", false, pointShadow.transforms[0]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[1]", false, pointShadow.transforms[1]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[2]", false, pointShadow.transforms[2]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[3]", false, pointShadow.transforms[3]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[4]", false, pointShadow.transforms[4]);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
+				"shadowMatrices[5]", false, pointShadow.transforms[5]);
+
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform1f("far_plane", scene.camera.farPlane);
+			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform3f("lightPos", scene.pointLight.position);
+
+			for (auto& object : scene.objects) {
+				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("point_shadow_depth"));
+			}
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// reset viewport
+		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glCullFace(GL_BACK);
+	}
+
+
+	float GetSceneAvgLuminance() {
+		glBindTexture(GL_TEXTURE_2D, sceneColorBufs[0]);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		const int mipLevel = (int)std::log2(std::max(g_config.r_resolution.x, g_config.r_resolution.y));
+		float pixel[3] = {0.0f, 0.0f, 0.0f};
+		glGetTexImage(GL_TEXTURE_2D, mipLevel, GL_RGB, GL_FLOAT, &pixel);
+
+		return 0.2126f * pixel[0] + 0.7152f * pixel[1] + 0.0722f * pixel[2];
+	}
+
+	void FrameBegin(Scene& scene) {
+		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO); // draw everything in custom framebuffer
+
+		UpdateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
+		UpdateUBOData(scene.camera.position);
+		UpdateUBOMatrices(scene.camera.projectionMatrix, scene.camera.viewMatrix,
+		                  dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, dirShadow.shadowMap);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, spotShadow.shadowMap);
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
+	}
+
+	void ApplyPostProcess(double dt) {
+		uint32_t bloom = sceneColorBufs[1];
+
+		// calc exposure
+		if (g_config.fx_autoExposure) {
+			g_config.fx_exposure = PostEffects::GetLerpExposure(g_config.fx_exposure, GetSceneAvgLuminance(),
+			                                                    g_config.fx_autoExposureSpeed);
+		}
+		if (g_config.fx_bloom) bloom = blur.blur(sceneColorBufs[1], g_config.r_blurPasses);
+
+		glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+		glBindFramebuffer(GL_FRAMEBUFFER, screenFBO);
+
+		Renderer::ShaderPtr postfxShader = ResourceMgr::GetShaderByName("postfx");
+
+		postfxShader->use();
+
+		postfxShader->setUniform2f("resolution", g_config.sys_windowResolution);
+		postfxShader->setUniform1f("time", glfwGetTime());
+
+		postfxShader->setUniform1i("effects.bloom", g_config.fx_bloom);
+		postfxShader->setUniform1f("effects.gamma", g_config.r_gamma);
+		postfxShader->setUniform1f("effects.chromaticOffset", g_config.fx_chromaticOffset);
+		postfxShader->setUniform1i("effects.quantization", g_config.fx_quantization);
+		postfxShader->setUniform1i("effects.quantizationLevel", g_config.fx_quantizationLevel);
+		postfxShader->setUniform1i("effects.vignette", g_config.fx_vignette);
+		postfxShader->setUniform1f("effects.vignetteIntensity", g_config.fx_vignetteIntensity);
+		postfxShader->setUniform3f("effects.vignetteColor", g_config.fx_vignetteColor);
+		postfxShader->setUniform1f("effects.exposure", g_config.fx_exposure);
+
+		postfxShader->setUniform1i("screenTexture", 0);
+		postfxShader->setUniform1i("bloomBlur", 1);
+
+		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, sceneColorBufs[0]);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, bloom); // BLOOM BLUR
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		glEnable(GL_DEPTH_TEST);
+	}
+
+	void FrameEnd() {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glDisable(GL_DEPTH_TEST);
+		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
+
+		ResourceMgr::GetShaderByName("screenfbo")->use();
+		ResourceMgr::GetShaderByName("screenfbo")->setUniform1i("texture0", 0);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, screenColorBuf);
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+
+		glEnable(GL_DEPTH_TEST);
+
+		RenderClear();
+		glfwSwapBuffers(g_window);
+	}
+
+	void DrawRectOnScreen(float x, float y, float w, float h, const Color::rgba_t& color) {
+		Renderer::ShaderPtr shader = ResourceMgr::GetShaderByName("solidcolor");
+
+		shader->use();
+
+		// Устанавливаем матрицу модели
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(x, y, 0.0f));
+		model = glm::scale(model, glm::vec3(w, h, 1.0f));
+
+		shader->setUniformMat4fv("uModel", false, model);
+
+		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.r_resolution.x, (float)g_config.r_resolution.y, 0.0f);
+
+		shader->setUniformMat4fv("uProjection", false, projection);
+
+		shader->setUniform4f("color", color);
+
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_DEPTH_TEST);
+	}
+
+	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h) {
+		Renderer::ShaderPtr shader = ResourceMgr::GetShaderByName("texture");
+
+		shader->use();
+
+		// Устанавливаем матрицу модели
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(x, y, 0.0f));
+		model = glm::scale(model, glm::vec3(w, h, 1.0f));
+
+		shader->setUniformMat4fv("uModel", false, model);
+
+		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.r_resolution.x, (float)g_config.r_resolution.y, 0.0f);
+
+		shader->setUniformMat4fv("uProjection", false, projection);
+
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture);
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_DEPTH_TEST);
+	}
+
+	void Shutdown() {
+		glDeleteFramebuffers(1, &screenFBO);
+		glDeleteTextures(1, &screenColorBuf);
+
+		glDeleteFramebuffers(1, &sceneFBO);
+		glDeleteTextures(2, sceneColorBufs);
+		glDeleteRenderbuffers(1, &RBO);
+	}
+
+	void UpdateRenderRes() {
+		for (int i = 0; i < 2; i++) {
+			glBindTexture(GL_TEXTURE_2D, sceneColorBufs[i]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+			             GL_FLOAT,
+			             NULL);
+		}
+
+		glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.r_resolution.x, g_config.r_resolution.y);
+	}
+}
