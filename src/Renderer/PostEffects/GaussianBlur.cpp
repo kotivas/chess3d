@@ -1,4 +1,3 @@
-#pragma once
 #include "GaussianBlur.hpp"
 
 #include "Core/Logger.hpp"

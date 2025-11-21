@@ -10,9 +10,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "./Input/Input.hpp"
 #include "stb_image_write.h"
-#include "Ui/Text/MSDFText.hpp"
+#include "UI/Text/MSDFText.hpp"
+#include "UI/Console/Console.hpp"
 #include "Common/Utils.hpp"
-#include "Ui/Console/Console.hpp"
 #include "Core/Backend.hpp"
 #include "Core/CMDUtils.hpp"
 #include "Core/CVar.hpp"
@@ -104,32 +104,39 @@ void updateControls() {
 }
 
 void setupScene() {
+	const auto base_shader = ResourceMgr::GetShaderByName("LightingShader");
+	if (!base_shader) {
+		Log::Error("setupScene(): Unable to get base shader");
+		return;
+	}
+
 	Renderer::MeshPtr cube = Utils::CreateCubeMesh("lightcube", 100);
-	cube->transform = {
-		.position = glm::vec3(0),
-		.rotation = glm::vec3(0),
-		.scale = glm::vec3(.25f),
-	};
+	cube->transform = {.scale = glm::vec3(.25f)};
 	cube->material->shader = ResourceMgr::GetShaderByName("LightCube");
-	// cube->castShadow = false;
-	scene.objects.push_back(cube);
 
-	Renderer::ModelPtr toy = ResourceMgr::GetModelByName("slayer_toy");
-	toy->transform = {
-		.position = {-5, 16, 0},
-		.rotation = {-90, 0, -45},
-		.scale = glm::vec3(0.3f)
+	Renderer::MeshPtr plane = Utils::CreatePlaneMesh(100, "plane");
+	plane->transform = {.scale = {500, 1, 500}};
+	plane->material->useSolidColor = true;
+	plane->material->solidColor = {0.3, 0.3, 0.3};
+	plane->material->shader = base_shader;
+
+	// loading models
+	ResourceMgr::LoadModel("glock", "assets/models/glock/Glock-17gen5.fbx", base_shader);
+	Renderer::ModelPtr glock = ResourceMgr::GetModelByName("glock");
+	glock->transform = {
+		.position = {0, 0, 0},
+		.quaternion = glm::angleAxis(glm::radians(90.0f), glm::vec3(1,0,0)),
+		.scale = glm::vec3(1),
 	};
-	scene.objects.push_back(toy);
 
-	Renderer::ModelPtr desk = ResourceMgr::GetModelByName("desk");
-	desk->transform.scale = {20, 20, 20};
-	scene.objects.push_back(desk);
+	if (plane) scene.objects.push_back(plane);
+	if (cube) scene.objects.push_back(cube);
+	if (glock) scene.objects.push_back(glock);
 }
 
 void LoadAll() {
-	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata_light.png",
-	                          "assets/fonts/inconsolata_light.json");
+	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata/inconsolata_light.png",
+	                          "assets/fonts/inconsolata/inconsolata_light.json");
 	// ALL SHADERS
 	ResourceMgr::LoadShader("screenfbo", "Shaders/PostEffects/PostFX.vert", "Shaders/2DTexture.frag");
 	ResourceMgr::LoadShader("GaussianBlur", "Shaders/PostEffects/GaussianBlur.vert",
@@ -142,11 +149,6 @@ void LoadAll() {
 	ResourceMgr::LoadShader("msdf_text", "Shaders/MSDFText.vert", "Shaders/MSDFText.frag");
 	ResourceMgr::LoadShader("point_shadow_depth", "Shaders/point_shadow_depth.vert", "Shaders/point_shadow_depth.frag",
 	                        "Shaders/point_shadow_depth.geom");
-
-	// ALL MODELS
-
-	ResourceMgr::LoadModel("slayer_toy", "assets/models/slayer_toy.obj", ResourceMgr::GetShaderByName("LightingShader"));
-	ResourceMgr::LoadModel("desk", "assets/models/desk.obj", ResourceMgr::GetShaderByName("LightingShader"));
 }
 
 void RegisterCVars() {
@@ -272,7 +274,7 @@ int main(int argc, char** argv) {
 	scene.camera = Camera::Camera(60, glm::vec3(0, 17, 0), 0.1, g_config.r_renderDistance);
 
 	Log::Init();
-	Log::SetSeverity(Logger::Severity::Info);
+	// Log::SetSeverity(Logger::Severity::Info);
 	Camera::FPSCameraController cameraController(0.1f);
 
 
@@ -288,17 +290,8 @@ int main(int argc, char** argv) {
 	setupScene();
 
 	double lastTime = glfwGetTime();
-	int fps = 0;
-	double timer = 0;
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		const double dt = glfwGetTime() - lastTime;
-
-		timer += dt;
-		if (timer > 0.5) {
-			timer -= 0.5;
-			fps = 1 / dt;
-		}
-
 		lastTime = glfwGetTime();
 
 		// UPDATE
@@ -313,18 +306,9 @@ int main(int argc, char** argv) {
 		Renderer::FrameBegin(scene);
 		for (const auto& object : scene.objects) {
 			if (object->name == "lightcube") object->transform.position = scene.pointLight.position;
-			object->draw();
+			if (object->drawable) object->draw();
 		}
-
 		Renderer::ApplyPostProcess(dt);
-		MSDFText::DrawText(std::to_string(fps), ResourceMgr::GetFontByName("inconsolata_light"),
-		                   g_config.r_resolution.x - 60,
-		                   g_config.r_resolution.y - 32, 32,
-		                   {Color::WHITE, 1});
-		MSDFText::DrawText(std::to_string(g_config.fx_exposure), ResourceMgr::GetFontByName("inconsolata_light"),
-		                   g_config.r_resolution.x - 60,
-		                   g_config.r_resolution.y - 64, 32,
-		                   {Color::WHITE, 1});
 		Console::Draw();
 		Renderer::FrameEnd();
 	}

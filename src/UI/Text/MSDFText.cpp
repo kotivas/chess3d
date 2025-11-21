@@ -5,6 +5,11 @@
 namespace MSDFText {
 	GLuint vao = 0, vbo = 0;
 
+	float Font::getStringWidth(const std::string& text, float scale) {
+		float width = 0.f;
+		for (const char cc : text) width += getGlyph(cc).advance * scale;
+		return width;
+	}
 
 	Glyph Font::getGlyph(const char& c) {
 		const uint8_t code = static_cast<uint8_t>(c);

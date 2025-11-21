@@ -5,42 +5,39 @@
 #include <assimp/postprocess.h>
 #include <rapidjson/document.h>
 #include <rapidjson/filereadstream.h>
-// #include <rapidjson/istreamwrapper.h>
 #include <fstream>
 #include <filesystem>
+#include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <ranges>
+#include <glm/gtx/matrix_decompose.hpp>
 
 #include "Core/Logger.hpp"
 
-
 namespace ResourceMgr {
-
-	Renderer::MeshPtr ProcessMesh(aiMesh* aiMesh) {
+	Renderer::MeshPtr ProcessMesh(const aiMesh* aiMesh) {
 		Renderer::MeshPtr mesh = std::make_unique<Renderer::Mesh>();
 		mesh->name = aiMesh->mName.C_Str();
-		// Обработка вершин
+
 		for (unsigned int j = 0; j < aiMesh->mNumVertices; j++) {
 			Renderer::Vertex vertex;
 
-			// Позиция вершины
 			vertex.pos.x = aiMesh->mVertices[j].x;
 			vertex.pos.y = aiMesh->mVertices[j].y;
 			vertex.pos.z = aiMesh->mVertices[j].z;
 
 			if (aiMesh->HasTangentsAndBitangents()) {
-				// mTangents/ mBittangetnts
 				vertex.tangent.x = aiMesh->mTangents[j].x;
 				vertex.tangent.y = aiMesh->mTangents[j].y;
 				vertex.tangent.z = aiMesh->mTangents[j].z;
 			}
 
-			// Нормали
 			if (aiMesh->HasNormals()) {
 				vertex.normal.x = aiMesh->mNormals[j].x;
 				vertex.normal.y = aiMesh->mNormals[j].y;
 				vertex.normal.z = aiMesh->mNormals[j].z;
 			}
 
-			// Текстурные координаты
 			if (aiMesh->HasTextureCoords(0)) {
 				vertex.texCoords.x = aiMesh->mTextureCoords[0][j].x;
 				vertex.texCoords.y = aiMesh->mTextureCoords[0][j].y;
@@ -49,18 +46,12 @@ namespace ResourceMgr {
 			mesh->vertices.push_back(vertex);
 		}
 
-		// Обработка индексов
 		for (unsigned int j = 0; j < aiMesh->mNumFaces; j++) {
 			aiFace face = aiMesh->mFaces[j];
 			for (unsigned int k = 0; k < face.mNumIndices; k++) {
 				mesh->indices.push_back(face.mIndices[k]);
 			}
 		}
-
-		//// Материал меша
-		//if (aiMesh->mMaterialIndex >= 0) {
-		//	mesh->material = mat;
-		//}
 
 		mesh->setup();
 		return mesh;
@@ -74,102 +65,121 @@ namespace ResourceMgr {
 		case aiTextureType_AMBIENT: return "AMBIENT";
 		case aiTextureType_EMISSIVE: return "EMISSIVE";
 		case aiTextureType_NORMALS: return "NORMALS";
-		case aiTextureType_BASE_COLOR: return "BASE_COLOR"; // Для PBR
-		// ... другие типы
+		case aiTextureType_BASE_COLOR: return "BASE_COLOR";
 		default: return "UNKNOWN";
 		}
 	}
 
-	Renderer::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& modelName) {
+	glm::mat4 AssimpMatrixToGLM(const aiMatrix4x4& m) {
+		return glm::mat4{
+			m.a1, m.b1, m.c1, m.d1,
+			m.a2, m.b2, m.c2, m.d2,
+			m.a3, m.b3, m.c3, m.d3,
+			m.a4, m.b4, m.c4, m.d4
+		};
+	}
+
+	Renderer::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& directory) {
 		Renderer::MaterialPtr nmat = std::make_shared<Renderer::Material>();
 
-		aiString matName;
-		aiMaterial->Get(AI_MATKEY_NAME, matName);
-		nmat->name = matName.C_Str();
+		nmat->name = aiMaterial->GetName().C_Str();
 
 		float shininess;
 		aiMaterial->Get(AI_MATKEY_SHININESS, shininess);
 		nmat->shininess = shininess;
-		if (nmat->shininess == 0) nmat->shininess = 32.f;
+		// if (nmat->shininess == 0) nmat->shininess = 32.f;
+
 
 		aiString diffuseTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexPath) == AI_SUCCESS) {
-			nmat->diffuse[0] = CreateTexture(diffuseTexPath.C_Str());
-		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png")) {
-			// assets/textures/desk/BaseColor.png
-			nmat->diffuse[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png");
+			nmat->diffuse[0] = CreateTexture(directory + diffuseTexPath.C_Str());
 		} else {
-			Log::Warning("No diffuse texture for material: " + std::string(nmat->name) + " (unable to find at path " +
-			             "assets/textures/" + modelName + "/" + nmat->name + "_diffuse.png)");
+			Log::Warning("No diffuse texture for material: {0}", nmat->name);
 			nmat->diffuse[0] = CreateDefaultTexture({0, 0, 0}, {255, 0, 255});
 		}
 
 		aiString specularTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_SPECULAR, 0, &specularTexPath) == AI_SUCCESS) {
-			nmat->specular[0] = CreateTexture(specularTexPath.C_Str());
-		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_specular.png")) {
-			nmat->specular[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_specular.png");
+			nmat->specular[0] = CreateTexture(directory + specularTexPath.C_Str());
 		}
 
 		aiString normalTexPath;
-		if (aiMaterial->GetTexture(aiTextureType_HEIGHT, 0, &normalTexPath) == AI_SUCCESS) {
-			nmat->normal[0] = CreateTexture(normalTexPath.C_Str());
-		} else if (std::filesystem::exists("assets/textures/" + modelName + "/" + nmat->name + "_normal.png")) {
-			nmat->normal[0] = CreateTexture("assets/textures/" + modelName + "/" + nmat->name + "_normal.png");
+		if (aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &normalTexPath) == AI_SUCCESS) {
+			nmat->normal[0] = CreateTexture(directory + normalTexPath.C_Str());
+		}
+
+		aiString heightTexPath;
+		if (aiMaterial->GetTexture(aiTextureType_HEIGHT, 0, &heightTexPath) == AI_SUCCESS) {
+			nmat->normal[0] = CreateTexture(directory + heightTexPath.C_Str());
 		}
 
 		return nmat;
 	}
 
-	void LoadModel(const std::string& name, const std::string& path, Renderer::ShaderPtr shader) {
-		defaultTexture = CreateDefaultTexture({0, 0, 0}, {255, 0, 255});
+	void ProcessNode(aiNode* node, const aiScene* scene, const glm::mat4& transform, const Renderer::ModelPtr& model) {
+		glm::mat4 global_transform = transform * AssimpMatrixToGLM(node->mTransformation);
 
+		if (node->mNumMeshes > 0) {
+			for (unsigned int i = 0; i < node->mNumMeshes; i++) {
+				aiMesh* aiMesh = scene->mMeshes[node->mMeshes[i]];
+				Renderer::MeshPtr mesh = ProcessMesh(aiMesh);
+
+				Renderer::Transform3d trans;
+				glm::vec3 skew;
+				glm::vec4 s;
+
+				glm::decompose(global_transform, trans.scale, trans.quaternion, trans.position, skew, s);
+				trans.quaternion = glm::normalize(trans.quaternion);
+
+				aiMaterial* mat = scene->mMaterials[aiMesh->mMaterialIndex];
+				if (!g_materials.contains(mat)) {
+					Renderer::MaterialPtr nmat;
+					nmat = ProcessMaterial(mat, "./");
+					g_materials.emplace(mat, nmat);
+				}
+
+				mesh->material = g_materials[mat];
+
+				mesh->transform = trans;
+
+				model->meshes.push_back(mesh);
+			}
+		}
+
+		for (int i = 0; i < node->mNumChildren; i++) ProcessNode(node->mChildren[i], scene, global_transform, model);
+	}
+
+	bool LoadModel(const std::string& name, const std::string& path, Renderer::ShaderPtr shader) {
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(
-			path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+			path, aiProcess_Triangulate |
+			aiProcess_FlipUVs |
+			aiProcess_GenSmoothNormals |
+			aiProcess_CalcTangentSpace |
+			aiProcess_OptimizeMeshes |
+			aiProcess_OptimizeGraph);
 
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 			Log::Error("Failed to load model: " + std::string(importer.GetErrorString()));
-			return;
+			return false;
 		}
 
-		// create model and set name
-		Renderer::ModelPtr model = std::make_unique<Renderer::Model>();
-		std::string model_name = path.substr(path.find_last_of("/\\") + 1);
-		model_name = model_name.substr(0, model_name.find_last_of('.'));
-		model->name = model_name;
+		Renderer::ModelPtr model = std::make_unique<Renderer::Model>(name);
 
+		ProcessNode(scene->mRootNode, scene, glm::mat4(1.f), model);
 
-		// handle materials
-		std::vector<Renderer::MaterialPtr> nmats;
-
-		for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
-			aiMaterial* aiMaterial = scene->mMaterials[i];
-			nmats.push_back(ProcessMaterial(aiMaterial, model->name));
-			nmats.back()->shader = shader;
+		for (const auto& mat : g_materials | std::views::values) {
+			mat->shader = shader;
 		}
 
-		// if there is no material in file, create and use default one
-		if (scene->mNumMaterials == 0) {
-			Log::Warning("No materials found in model: " + path);
-			Renderer::MaterialPtr nmat = std::make_shared<Renderer::Material>();
-			nmat->diffuse[0] = defaultTexture;
-			nmat->name = "default";
-			nmat->shader = shader;
-			nmats.push_back(nmat);
-		}
-
-		// handle meshes
-
-		for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
-			aiMesh* aiMesh = scene->mMeshes[i];
-			Renderer::MeshPtr mesh = ProcessMesh(aiMesh);
-			mesh->material = nmats[aiMesh->mMaterialIndex];
-			model->meshes.push_back(mesh);
-		}
 
 		Log::Debug("Model loaded: " + name);
-
 		g_models.insert({name, model});
+
+		if (scene->HasLights()) Log::Info("Found lights but not handeled in {0}", path);
+		if (scene->HasCameras()) Log::Info("Found cameras but not handeled in {0}", path);
+		if (scene->HasAnimations()) Log::Info("Found animations but not handeled in {0}", path);
+
+		return true;
 	}
 }

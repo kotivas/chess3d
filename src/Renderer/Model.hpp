@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
 #include <glm/glm.hpp>
-#include <unordered_map>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <string>
 #include <memory>
 #include <iostream>
@@ -16,21 +18,17 @@ namespace Renderer {
 		glm::vec3 tangent;
 	};
 
-	struct Transform {
+	struct Transform3d {
 		glm::vec3 position{0};
-		glm::vec3 rotation{0};
+		glm::quat quaternion{0, 0, 0, 1};
 		glm::vec3 scale{1};
 
 		[[nodiscard]] glm::mat4 getMatrix() const {
 			glm::mat4 transform{1};
 			transform = glm::translate(transform, position);
-
-			transform = glm::rotate(transform, glm::radians(rotation.x), {1, 0, 0});
-			transform = glm::rotate(transform, glm::radians(rotation.y), {0, 1, 0});
-			transform = glm::rotate(transform, glm::radians(rotation.z), {0, 0, 1});
-
+			transform *= glm::mat4_cast(quaternion);
 			transform = glm::scale(transform, scale);
-			return (transform == glm::mat4(0)) ? glm::mat4(1) : transform;
+			return transform;
 		}
 	};
 
@@ -54,11 +52,16 @@ namespace Renderer {
 
 	class DrawableObject {
 	public:
-		virtual void draw(const Transform& model = {}) = 0;
-		virtual void draw(const ShaderPtr& shader, const Transform& model = {}) = 0;
+		DrawableObject(const std::string& name)
+			: drawable(true), name(name) {
+		}
 
-		std::string name = "undefined";
-		Transform transform;
+		virtual void draw(const Transform3d& model = {}) = 0;
+		virtual void draw(const ShaderPtr& shader, const Transform3d& model = {}) = 0;
+
+		bool drawable;
+		std::string name;
+		Transform3d transform;
 		bool castShadow{true};
 
 		virtual ~DrawableObject() = default;
@@ -68,16 +71,16 @@ namespace Renderer {
 
 	class Mesh final : public DrawableObject {
 	public:
-		Mesh() : drawable(true), VBO(0), VAO(0), EBO(0) {}
+		Mesh(const std::string& name = "undefined") : DrawableObject(name), VBO(0), VAO(0), EBO(0) {
+		}
 
-		bool drawable;
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
 		uint32_t VBO, VAO, EBO;
 		MaterialPtr material;
 
-		void draw(const Transform& model) override;
-		void draw(const ShaderPtr& shader, const Transform& model) override;
+		void draw(const Transform3d& model = {}) override;
+		void draw(const ShaderPtr& shader, const Transform3d& model) override;
 
 		void setup();
 
@@ -88,13 +91,15 @@ namespace Renderer {
 
 	class Model final : public DrawableObject {
 	public:
-		Model() = default;
+		Model(const std::string& name = "undefined")
+			: DrawableObject(name) {
+		}
 
 		[[nodiscard]] MeshPtr findMeshByName(const std::string& name) const;
 
 		std::vector<MeshPtr> meshes; // unordered map for quicker search by name
-		void draw(const Transform& model = {}) override;
-		void draw(const ShaderPtr& shader, const Transform& model) override;
+		void draw(const Transform3d& model = {}) override;
+		void draw(const ShaderPtr& shader, const Transform3d& model) override;
 
 		~Model() override;
 	};

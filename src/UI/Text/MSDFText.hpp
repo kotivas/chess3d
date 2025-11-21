@@ -28,6 +28,7 @@ namespace MSDFText {
 		std::unordered_map<uint32_t, Glyph> glyphs;
 
 		Glyph getGlyph(const char& c);
+		float getStringWidth(const std::string& text, float scale);
 	};
 
 	using FontPtr = std::shared_ptr<Font>;

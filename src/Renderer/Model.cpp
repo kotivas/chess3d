@@ -52,7 +52,7 @@ namespace Renderer {
 
 		shader->use();
 
-		shader->setUniform1f("material.shininess", shininess); // to _materials
+		shader->setUniform1f("material.shininess", shininess);
 		shader->setUniform3f("material.solidColor", solidColor);
 		shader->setUniform1i("material.useSolidColor", useSolidColor);
 		shader->setUniform1i("shadowMap", 0);
@@ -65,11 +65,13 @@ namespace Renderer {
 		shader->setUniform1i("material.normal", 5);
 	}
 
-	void Mesh::draw(const Transform& model) {
-		assert(material);
+	void Mesh::draw(const Transform3d& model) {
+		if (!material) {
+			Log::Error("Mesh::draw material is nullptr");
+			return;
+		}
 
 		material->apply();
-
 
 		glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
 		material->shader->setUniformMat4fv("u_Model", GL_FALSE, modelMat);
@@ -81,7 +83,12 @@ namespace Renderer {
 		glActiveTexture(GL_TEXTURE0);
 	}
 
-	void Mesh::draw(const ShaderPtr& shader, const Transform& model) {
+	void Mesh::draw(const ShaderPtr& shader, const Transform3d& model) {
+		if (!shader) {
+			Log::Error("Mesh::draw shader is nullptr");
+			return;
+		}
+
 		shader->use();
 
 		glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
@@ -99,20 +106,12 @@ namespace Renderer {
 	}
 
 
-	void Model::draw(const ShaderPtr& shader, const Transform& model) {
-		for (const MeshPtr& mesh : meshes) {
-			if (mesh->drawable) {
-				mesh->draw(shader, this->transform);
-			}
-		}
+	void Model::draw(const ShaderPtr& shader, const Transform3d& model) {
+		for (const MeshPtr& mesh : meshes) mesh->draw(shader, this->transform);
 	}
 
-	void Model::draw(const Transform& model) {
-		for (const MeshPtr& mesh : meshes) {
-			if (mesh->drawable) {
-				mesh->draw(this->transform);
-			}
-		}
+	void Model::draw(const Transform3d& model) {
+		for (const MeshPtr& mesh : meshes) mesh->draw(this->transform);
 	}
 
 	MeshPtr Model::findMeshByName(const std::string& name) const {

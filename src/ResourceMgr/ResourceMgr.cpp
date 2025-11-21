@@ -17,6 +17,7 @@ namespace ResourceMgr {
 	std::unordered_map<std::string, MSDFText::FontPtr> g_fonts;
 	std::unordered_map<std::string, Renderer::ShaderPtr> g_shaders;
 	std::unordered_map<std::string, uint32_t> g_textures;
+	std::unordered_map<const aiMaterial*, Renderer::MaterialPtr> g_materials;
 
 
 	Renderer::ModelPtr GetModelByName(const std::string& name) {

@@ -1,7 +1,7 @@
 #include "Input.hpp"
 #include <GLFW/glfw3.h>
 
-#include "Ui/Console/Console.hpp"
+#include "UI/Console/Console.hpp"
 
 
 namespace Input {

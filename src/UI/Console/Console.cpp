@@ -12,7 +12,7 @@
 #include "Input/Input.hpp"
 #include "Renderer/Renderer.hpp"
 #include "ResourceMgr/ResourceMgr.hpp"
-#include "Ui/Text/MSDFText.hpp"
+#include "UI/Text/MSDFText.hpp"
 
 namespace Console {
 	int g_scrollOffset = 0;
@@ -25,6 +25,7 @@ namespace Console {
 	bool g_isVisible = false;
 	bool g_blinked = false;
 	double g_blinkTimer = 0.f;
+	int g_fps = 0;
 
 	void Toggle() {
 		g_isVisible = !g_isVisible;
@@ -76,13 +77,15 @@ namespace Console {
 			return;
 		}
 
+
 		auto* cvar = CMDUtils::Find(name);
 		if (!cvar) {
 			Log::Warning("Unknown command <" + name + ">");
 			return;
 		}
 
-		if (std::string value_str; !(iss >> value_str)) {
+		std::string value_str;
+		if ( !(iss >> value_str) ) {
 			Print(Color::WHITE,
 			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name,
 			                  CMDUtils::ToString(cvar->val), cvar->desc,
@@ -99,6 +102,7 @@ namespace Console {
 
 		g_blinkTimer += dt;
 		if (g_blinkTimer >= BLINK_INTERVAL) {
+			g_fps = 1 / dt;
 			g_blinked = !g_blinked;
 			g_blinkTimer -= BLINK_INTERVAL;
 		}
@@ -119,7 +123,7 @@ namespace Console {
 				int(g_inputField.size()), g_cursorIndent + 1);
 
 
-		if (!Input::GetTextBuffer().empty()) {
+		if (!Input::GetTextBuffer().empty() && Input::GetTextBuffer().back() != '`') {
 			g_inputField.insert(g_inputField.size() - g_cursorIndent, Input::GetTextBuffer());
 		}
 
@@ -166,7 +170,7 @@ namespace Console {
 			return;
 		}
 
-		const int& fontScale = g_config.con_fontScale;
+		const float& fontScale = g_config.con_fontScale;
 		const int& maxVisibleLines = g_config.con_maxVisibleLines;
 
 		const float lineHeight = font->lineHeight * fontScale;
@@ -183,11 +187,9 @@ namespace Console {
 		                   {1, 1, 1, 1});
 
 		if (!g_blinked) {
-			float x = leftIndent;
 			std::string calcs = "> " + g_inputField;
 			calcs.erase(calcs.length() - g_cursorIndent, g_cursorIndent);
-			for (const char& cc : calcs) x += font->getGlyph(cc).advance * fontScale;
-
+			float x = leftIndent + font->getStringWidth(calcs, fontScale);
 			Renderer::DrawRectOnScreen(x, maxHeight - font->lineHeight * fontScale, 1, lineHeight / 2,
 			                           {Color::WHITE, 1});
 		}
@@ -231,6 +233,18 @@ namespace Console {
 		for (int i = 0; i < line_boxes.size(); i++) {
 			MSDFText::DrawText(line_boxes[i].text, font, leftIndent, lineyzero - i * lineHeight, fontScale,
 			                   {line_boxes[i].color, 1});
+		}
+
+		// STEP 4 --- DEBUG INFO
+		const std::vector debug_lines = {
+			"FPS: " + std::to_string(g_fps),
+			"Exposure: " + std::to_string(g_config.fx_exposure),
+		};
+
+		for (int i = 0; i < debug_lines.size(); i++) {
+			float x = maxWidth - font->getStringWidth(debug_lines[i], fontScale);
+			float y = lineyzero - i * lineHeight;
+			MSDFText::DrawText(debug_lines[i], font, x, y, fontScale, {Color::WHITE, 1});
 		}
 	}
 
