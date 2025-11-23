@@ -20,15 +20,14 @@ namespace Renderer {
 
 	struct Transform3d {
 		glm::vec3 position{0};
-		glm::quat quaternion{0, 0, 0, 1};
+		glm::quat quaternion{0, 0, 0, 0};
 		glm::vec3 scale{1};
 
 		[[nodiscard]] glm::mat4 getMatrix() const {
-			glm::mat4 transform{1};
-			transform = glm::translate(transform, position);
-			transform *= glm::mat4_cast(quaternion);
-			transform = glm::scale(transform, scale);
-			return transform;
+			const glm::mat4 t = glm::translate({1}, position);
+			const glm::mat4 s = glm::scale({1}, scale);
+			const glm::mat4 r = glm::mat4_cast(quaternion);
+			return t * r * s;
 		}
 	};
 

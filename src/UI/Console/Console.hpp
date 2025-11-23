@@ -26,7 +26,6 @@ namespace Console {
 	extern bool g_blinked;
 	extern int g_cursorIndent;
 	extern std::string g_suggestion;
-	extern int g_fps;
 
 	void Init();
 	void Update(double dt);

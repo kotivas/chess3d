@@ -25,7 +25,6 @@ namespace Console {
 	bool g_isVisible = false;
 	bool g_blinked = false;
 	double g_blinkTimer = 0.f;
-	int g_fps = 0;
 
 	void Toggle() {
 		g_isVisible = !g_isVisible;
@@ -102,7 +101,6 @@ namespace Console {
 
 		g_blinkTimer += dt;
 		if (g_blinkTimer >= BLINK_INTERVAL) {
-			g_fps = 1 / dt;
 			g_blinked = !g_blinked;
 			g_blinkTimer -= BLINK_INTERVAL;
 		}
@@ -233,18 +231,6 @@ namespace Console {
 		for (int i = 0; i < line_boxes.size(); i++) {
 			MSDFText::DrawText(line_boxes[i].text, font, leftIndent, lineyzero - i * lineHeight, fontScale,
 			                   {line_boxes[i].color, 1});
-		}
-
-		// STEP 4 --- DEBUG INFO
-		const std::vector debug_lines = {
-			"FPS: " + std::to_string(g_fps),
-			"Exposure: " + std::to_string(g_config.fx_exposure),
-		};
-
-		for (int i = 0; i < debug_lines.size(); i++) {
-			float x = maxWidth - font->getStringWidth(debug_lines[i], fontScale);
-			float y = lineyzero - i * lineHeight;
-			MSDFText::DrawText(debug_lines[i], font, x, y, fontScale, {Color::WHITE, 1});
 		}
 	}
 

@@ -124,9 +124,9 @@ void setupScene() {
 	ResourceMgr::LoadModel("glock", "assets/models/glock/Glock-17gen5.fbx", base_shader);
 	Renderer::ModelPtr glock = ResourceMgr::GetModelByName("glock");
 	glock->transform = {
-		.position = {0, 0, 0},
-		.quaternion = glm::angleAxis(glm::radians(90.0f), glm::vec3(1,0,0)),
-		.scale = glm::vec3(1),
+		.position = {0, 17, 0},
+		// .quaternion = glm::quat(glm::radians(glm::vec3(0, 0, 0))),
+		.scale = glm::vec3(0.1),
 	};
 
 	if (plane) scene.objects.push_back(plane);
@@ -239,6 +239,25 @@ void RegisterCVars() {
 	));
 }
 
+void DrawDebug(const int fps, const float scale) {
+	const MSDFText::FontPtr font = ResourceMgr::GetFontByName("inconsolata_light");
+
+	const std::vector debug_lines = {
+		"FPS: " + std::to_string(fps),
+		std::format("{0:.2f} {1:.2f} {2:.2f}", scene.camera.position.x, scene.camera.position.y,
+		            scene.camera.position.z),
+		std::format("{:.3f}", g_config.fx_exposure),
+	};
+
+	for (int i = 0; i < debug_lines.size(); i++) {
+		const float lineHeight = font->lineHeight * scale;
+		float x = g_config.r_resolution.x - font->getStringWidth(debug_lines[i], scale);
+		float y = g_config.r_resolution.y - lineHeight - i * lineHeight;
+
+		MSDFText::DrawText(debug_lines[i], font, x, y, scale, {Color::WHITE, 1});
+	}
+}
+
 int main(int argc, char** argv) {
 	g_config = {
 		.sensitivity = 0.1f,
@@ -310,6 +329,7 @@ int main(int argc, char** argv) {
 		}
 		Renderer::ApplyPostProcess(dt);
 		Console::Draw();
+		DrawDebug(1 / dt, 32);
 		Renderer::FrameEnd();
 	}
 	Renderer::Shutdown();

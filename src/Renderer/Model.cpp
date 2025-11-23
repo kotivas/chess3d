@@ -73,7 +73,7 @@ namespace Renderer {
 
 		material->apply();
 
-		glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
+		glm::mat4 modelMat = model.getMatrix() * this->transform.getMatrix();
 		material->shader->setUniformMat4fv("u_Model", GL_FALSE, modelMat);
 
 		glBindVertexArray(VAO);
@@ -91,7 +91,7 @@ namespace Renderer {
 
 		shader->use();
 
-		glm::mat4 modelMat = this->transform.getMatrix() * model.getMatrix();
+		glm::mat4 modelMat = model.getMatrix() * this->transform.getMatrix();
 		shader->setUniformMat4fv("u_Model", GL_FALSE, modelMat);
 
 		glBindVertexArray(VAO);
