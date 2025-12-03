@@ -22,13 +22,12 @@ namespace Console {
 	extern std::deque<std::string> g_history;
 	extern int g_historyIndex;
 	extern std::string g_inputField;
-	extern double g_blinkTimer;
-	extern bool g_blinked;
 	extern int g_cursorIndent;
 	extern std::string g_suggestion;
 
 	void Init();
 	void Update(double dt);
+
 	void Draw();
 	// void DrawDebugInfo();
 

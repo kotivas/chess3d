@@ -23,8 +23,6 @@ namespace Console {
 	std::vector<CMDLine> g_messages;
 	std::deque<std::string> g_history;
 	bool g_isVisible = false;
-	bool g_blinked = false;
-	double g_blinkTimer = 0.f;
 
 	void Toggle() {
 		g_isVisible = !g_isVisible;
@@ -84,7 +82,7 @@ namespace Console {
 		}
 
 		std::string value_str;
-		if ( !(iss >> value_str) ) {
+		if (!(iss >> value_str)) {
 			Print(Color::WHITE,
 			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name,
 			                  CMDUtils::ToString(cvar->val), cvar->desc,
@@ -98,12 +96,6 @@ namespace Console {
 
 	void Update(double dt) {
 		if (!g_isVisible) return;
-
-		g_blinkTimer += dt;
-		if (g_blinkTimer >= BLINK_INTERVAL) {
-			g_blinked = !g_blinked;
-			g_blinkTimer -= BLINK_INTERVAL;
-		}
 
 		if (Input::GetScrollYOffset() != 0.f) {
 			g_scrollOffset += Input::GetScrollYOffset() < 0 ? -1 : 1;
@@ -170,27 +162,20 @@ namespace Console {
 
 		const float& fontScale = g_config.con_fontScale;
 		const int& maxVisibleLines = g_config.con_maxVisibleLines;
-
 		const float lineHeight = font->lineHeight * fontScale;
 		const float lineyzero = g_config.r_resolution.y - lineHeight;
+
 		const float leftIndent = 5;
-		const float maxHeight = lineyzero - maxVisibleLines * lineHeight;
-		const float maxWidth = g_config.r_resolution.x - leftIndent;
+		const float height = lineHeight * (maxVisibleLines + 1) - (font->descender * fontScale)*2;
+		const float width = g_config.r_resolution.x - leftIndent;
 
-		Renderer::DrawRectOnScreen(0, 0, maxWidth + leftIndent, maxHeight, g_config.con_backgroundColor);
-		Renderer::DrawRectOnScreen(0, maxHeight, maxWidth + leftIndent, 1, {Color::YELLOW, 1});
-
+		Renderer::DrawRectOnScreen(0, 0, width + leftIndent, height, g_config.con_backgroundColor);
+		Renderer::DrawRectOnScreen(0, height, width + leftIndent, 1, {Color::YELLOW, 1});
+		//
 		// STER 0 --------------------------------- draw input field
-		MSDFText::DrawText("> " + g_inputField, font, leftIndent, maxHeight + font->descender * fontScale, fontScale,
-		                   {1, 1, 1, 1});
-
-		if (!g_blinked) {
-			std::string calcs = "> " + g_inputField;
-			calcs.erase(calcs.length() - g_cursorIndent, g_cursorIndent);
-			float x = leftIndent + font->getStringWidth(calcs, fontScale);
-			Renderer::DrawRectOnScreen(x, maxHeight - font->lineHeight * fontScale, 1, lineHeight / 2,
-			                           {Color::WHITE, 1});
-		}
+		MSDFText::DrawText("> " + g_inputField, font, leftIndent,
+		                   lineyzero - maxVisibleLines * lineHeight, fontScale,
+		                   {Color::WHITE, 1});
 
 		if (g_messages.empty()) return;
 		// STEP 1 --------------------------------- get visible messages vector
@@ -208,18 +193,16 @@ namespace Console {
 		std::vector<CMDLine> line_boxes;
 
 		for (const auto& msg : messages) {
-			const int maxChar = MSDFText::GetMaxCharactersForWidth(msg.text, font, fontScale, maxWidth);
+			const int maxChar = MSDFText::GetMaxCharactersForWidth(msg.text, font, fontScale, width);
+			std::string str = msg.text;
 
-			if (msg.text.length() > maxChar) {
-				// todo multiple lines
-				line_boxes.emplace_back(msg.color, msg.text.substr(0, maxChar));
-				line_boxes.emplace_back(msg.color, msg.text.substr(maxChar));
-			} else if (msg.text.find('\n') != std::string::npos) {
-				line_boxes.emplace_back(msg.color, msg.text.substr(0, msg.text.find('\n')));
-				line_boxes.emplace_back(msg.color, msg.text.substr(msg.text.find('\n') + 1));
-			} else {
-				line_boxes.emplace_back(msg.color, msg.text);
+			int i = 0;
+			while (str.length() > maxChar) {
+				line_boxes.emplace_back(msg.color, msg.text.substr(maxChar * i, maxChar));
+				str = str.substr(maxChar);
+				i++;
 			}
+			line_boxes.emplace_back(msg.color, str);
 		}
 
 		if (line_boxes.size() > maxVisibleLines) {
