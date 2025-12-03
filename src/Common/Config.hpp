@@ -19,7 +19,7 @@ struct Config {
 	int fx_quantizationLevel;
 	bool fx_vignette;
 	float fx_vignetteIntensity;
-
+	float fx_saturation;
 	float fx_exposure;
 	bool fx_autoExposure;
 	float fx_autoExposureSpeed;

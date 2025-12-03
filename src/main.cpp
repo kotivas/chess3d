@@ -115,7 +115,7 @@ void setupScene() {
 	cube->material->shader = ResourceMgr::GetShaderByName("LightCube");
 
 	Renderer::MeshPtr plane = Utils::CreatePlaneMesh(100, "plane");
-	plane->transform = {.scale = {500, 1, 500}};
+	plane->transform = {.scale = {g_config.r_renderDistance, 1, g_config.r_renderDistance}};
 	plane->material->useSolidColor = true;
 	plane->material->solidColor = {0.3, 0.3, 0.3};
 	plane->material->shader = base_shader;
@@ -132,9 +132,15 @@ void setupScene() {
 	if (plane) scene.objects.push_back(plane);
 	if (cube) scene.objects.push_back(cube);
 	if (glock) scene.objects.push_back(glock);
+
+	scene.skybox = ResourceMgr::GetSkyboxByName("skybox");
+	scene.skybox->shader = ResourceMgr::GetShaderByName("skybox");
 }
 
 void LoadAll() {
+	ResourceMgr::LoadSkybox("skybox", "assets/textures/sky/blowout/");
+	ResourceMgr::LoadShader("skybox", "Shaders/Skybox.vert", "Shaders/Skybox.frag");
+
 	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata/inconsolata_light.png",
 	                          "assets/fonts/inconsolata/inconsolata_light.json");
 	// ALL SHADERS
@@ -216,7 +222,8 @@ void RegisterCVars() {
 	));
 	// --- Post-processing / Effects ---
 	CMDUtils::Register("fx_bloom", "Enable bloom effect (Boolean)", g_config.fx_bloom);
-	CMDUtils::Register("fx_chromaticOffset", "Strength of chromatic abberation", g_config.fx_chromaticOffset);
+	CMDUtils::Register("fx_saturation", "Intensity of the color (Float)", g_config.fx_saturation, 0.0, 100);
+	CMDUtils::Register("fx_chromaticOffset", "Strength of chromatic abberation (Float)", g_config.fx_chromaticOffset);
 	CMDUtils::Register("fx_exposure", "Exposure (Float)", g_config.fx_exposure, 0.1, 10);
 	CMDUtils::Register("fx_autoExposureSpeed", "Speed of automatic exposure (Float)", g_config.fx_autoExposureSpeed,
 	                   0.f, 1.f);
@@ -271,6 +278,7 @@ int main(int argc, char** argv) {
 		.fx_vignette = true,
 		.fx_vignetteIntensity = 0.25f,
 
+		.fx_saturation = 1.f,
 		.fx_exposure = 1.f,
 		.fx_autoExposure = true,
 		.fx_autoExposureSpeed = 0.02f,
@@ -323,10 +331,13 @@ int main(int argc, char** argv) {
 		// RENDER
 		Renderer::GenShadowMaps(scene);
 		Renderer::FrameBegin(scene);
+		Renderer::DrawSkybox(scene.skybox, scene.camera);
 		for (const auto& object : scene.objects) {
 			if (object->name == "lightcube") object->transform.position = scene.pointLight.position;
+			if (object->name == "plane") object->transform.position = {scene.camera.position.x, 0, scene.camera.position.z};
 			if (object->drawable) object->draw();
 		}
+		Renderer::DrawSkybox(scene.skybox, scene.camera);
 		Renderer::ApplyPostProcess(dt);
 		Console::Draw();
 		DrawDebug(1 / dt, 32);
@@ -334,7 +345,6 @@ int main(int argc, char** argv) {
 	}
 	Renderer::Shutdown();
 	// Input::Shutdown();
-
 	glfwTerminate();
 	return 0;
 }

@@ -339,6 +339,22 @@ namespace Renderer {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
 	}
 
+	void DrawSkybox(SkyboxPtr sky, Camera::Camera cam) {
+		glDepthFunc(GL_LEQUAL);
+		sky->shader->use();
+		glm::mat4 view = glm::mat4(glm::mat3(cam.viewMatrix));
+		sky->shader->setUniformMat4fv("view", false, view);
+		sky->shader->setUniformMat4fv("projection", false, cam.projectionMatrix);
+
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+			glBindVertexArray(sky->VAO);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, sky->texture);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBindVertexArray(0);
+		glDepthFunc(GL_LESS);
+	}
+
 	void ApplyPostProcess(double dt) {
 		uint32_t bloom = sceneColorBufs[1];
 
@@ -368,6 +384,7 @@ namespace Renderer {
 		postfxShader->setUniform1f("effects.vignetteIntensity", g_config.fx_vignetteIntensity);
 		postfxShader->setUniform3f("effects.vignetteColor", g_config.fx_vignetteColor);
 		postfxShader->setUniform1f("effects.exposure", g_config.fx_exposure);
+		postfxShader->setUniform1f("effects.saturation", g_config.fx_saturation);
 
 		postfxShader->setUniform1i("screenTexture", 0);
 		postfxShader->setUniform1i("bloomBlur", 1);

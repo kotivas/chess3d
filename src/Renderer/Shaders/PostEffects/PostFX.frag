@@ -14,7 +14,7 @@ struct Effects {
     float vignetteIntensity;
     vec3 vignetteColor;
     float chromaticOffset;
-
+    float saturation;
     float exposure;
 };
 
@@ -44,6 +44,15 @@ vec3 quantizeColor(vec3 color, int levels) {
     return floor(color * float(levels)) / float(max(levels, 1));
 }
 
+vec3 ACESFilm(vec3 x) {
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
 void main() {
     vec3 color = texture(screenTexture, TexCoords).rgb;
     vec2 screenDir = (TexCoords - 0.5) * 2.0;
@@ -51,8 +60,14 @@ void main() {
     if (effects.chromaticOffset > 0) color = sampleChromatic(TexCoords, screenDir, effects.chromaticOffset * 0.2);
     if (effects.quantization) color = quantizeColor(color, effects.quantizationLevel);
     if (effects.vignette) color = applyVignette(color);
-
     if (effects.bloom) color += texture(bloomBlur, TexCoords).rgb; // bloom blur blending
-    vec3 result = vec3(1.0) - exp(-color * effects.exposure); // tone mapping
-    FragColor = vec4(pow(result, vec3(1.0 / effects.gamma)), 1.0); // w gamma correction
+
+    color *= effects.exposure;
+    color = ACESFilm(color); // tone mapping (ACES)
+    // color grading
+    float intensity = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    vec3 grayscale = vec3(intensity);
+    color = mix(grayscale, color, effects.saturation); // saturation
+
+    FragColor = vec4(pow(color, vec3(1.0 / effects.gamma)), 1.0); // w gamma correction
 }
