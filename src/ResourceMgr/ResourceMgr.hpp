@@ -5,7 +5,7 @@
 #include <assimp/scene.h>
 #include <unordered_map>
 
-#include "Renderer/Skybox.hpp"
+#include "Renderer/Sky.hpp"
 
 namespace ResourceMgr {
 	// TODO make centrilazed textures and meshes
@@ -27,11 +27,9 @@ namespace ResourceMgr {
 	uint32_t GetTextureByName(const std::string& name);
 	Renderer::ModelPtr GetModelByName(const std::string& name);
 	Renderer::ShaderPtr GetShaderByName(const std::string& name);
-	Renderer::SkyboxPtr GetSkyboxByName(const std::string& name);
 	MSDFText::FontPtr GetFontByName(const std::string& name);
 
 	extern std::unordered_map<std::string, uint32_t> g_textures;
-	extern std::unordered_map<std::string, Renderer::SkyboxPtr> g_skyboxes;
 	extern std::unordered_map<std::string, Renderer::ModelPtr> g_models;
 	extern std::unordered_map<std::string, MSDFText::FontPtr> g_fonts;
 	extern std::unordered_map<std::string, Renderer::ShaderPtr> g_shaders;

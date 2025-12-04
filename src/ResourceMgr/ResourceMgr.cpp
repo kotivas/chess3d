@@ -15,7 +15,6 @@ namespace ResourceMgr {
 	static uint32_t defaultTexture = 0;
 	std::unordered_map<std::string, MSDFText::FontPtr> g_fonts;
 	std::unordered_map<std::string, Renderer::ModelPtr> g_models;
-	std::unordered_map<std::string, Renderer::SkyboxPtr> g_skyboxes;
 	std::unordered_map<std::string, Renderer::ShaderPtr> g_shaders;
 	std::unordered_map<std::string, uint32_t> g_textures;
 	std::unordered_map<const aiMaterial*, Renderer::MaterialPtr> g_materials;
@@ -35,10 +34,6 @@ namespace ResourceMgr {
 
 	uint32_t GetTextureByName(const std::string& name) {
 		return g_textures.contains(name) ? g_textures[name] : defaultTexture;
-	}
-
-	Renderer::SkyboxPtr GetSkyboxByName(const std::string& name) {
-		return g_skyboxes.contains(name) ? g_skyboxes[name] : nullptr;
 	}
 
 	void LoadTexture(const std::string& name, const std::string& path) {
@@ -227,50 +222,5 @@ namespace ResourceMgr {
 		Log::Debug("Texture loaded: {}", path);
 
 		return textureLoc;
-	}
-
-	void LoadSkybox(const std::string& name, const std::string& folder) {
-		const std::vector faces{
-			folder + "right.jpg",
-			folder + "left.jpg",
-			folder + "top.jpg",
-			folder + "bottom.jpg",
-			folder + "front.jpg",
-			folder + "back.jpg"
-		};
-
-		unsigned int textureID;
-		glGenTextures(1, &textureID);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
-
-		int width, height, nrChannels;
-		for (unsigned int i = 0; i < faces.size(); i++) {
-			unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
-			if (data) {
-				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-				             0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-				stbi_image_free(data);
-			} else {
-				Log::Error("Failed to load skybox at path {0}", faces[i]);
-			}
-		}
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-		auto sky = std::make_shared<Renderer::Skybox>();
-		sky->texture = textureID;
-		sky->name = name;
-
-		sky->setup();
-
-		if (!sky) {
-			Log::Error("Unable to load skybox");
-		} else {
-			Log::Debug("Skybox loaded: {}", folder);
-			g_skyboxes.emplace(name, sky);
-		}
 	}
 }

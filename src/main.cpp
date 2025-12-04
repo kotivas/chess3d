@@ -24,7 +24,7 @@ static Scene scene{
 	.dirLight{
 		.enable = true,
 		.direction = {-0.5f, -0.2f, -1.f},
-		.ambient = glm::vec3(0),
+		.ambient = glm::vec3(0.1, 0.1, 0.2),
 		.diffuse = glm::vec3(0.1, 0.1, 0.4),
 		.specular = glm::vec3(0.1f)
 	},
@@ -114,32 +114,38 @@ void setupScene() {
 	cube->transform = {.scale = glm::vec3(.25f)};
 	cube->material->shader = ResourceMgr::GetShaderByName("LightCube");
 
-	Renderer::MeshPtr plane = Utils::CreatePlaneMesh(100, "plane");
-	plane->transform = {.scale = {g_config.r_renderDistance, 1, g_config.r_renderDistance}};
+	Renderer::MeshPtr plane = Utils::CreateCubeMesh("plane", 100);
+	plane->transform = {.scale = {1000, 0.1, 1000}};
+	plane->castShadow = false;
 	plane->material->useSolidColor = true;
 	plane->material->solidColor = {0.3, 0.3, 0.3};
 	plane->material->shader = base_shader;
 
-	// loading models
+	const auto sky = std::make_shared<Renderer::Sky>();
+	sky->sunColor = Color::rgb_t(1.0, 0.9, 0.6);
+	sky->cirrusDensity = 0.4;
+	sky->cumulusDensity = 0.4;
+
+	sky->generateGeometry();
+	sky->setup();
+	sky->shader = ResourceMgr::GetShaderByName("sky");
+	scene.sky = sky;
+
 	ResourceMgr::LoadModel("glock", "assets/models/glock/Glock-17gen5.fbx", base_shader);
 	Renderer::ModelPtr glock = ResourceMgr::GetModelByName("glock");
 	glock->transform = {
 		.position = {0, 17, 0},
-		// .quaternion = glm::quat(glm::radians(glm::vec3(0, 0, 0))),
+		.quaternion = glm::quat(glm::radians(glm::vec3(0, 0, 0))),
 		.scale = glm::vec3(0.1),
 	};
 
-	if (plane) scene.objects.push_back(plane);
+	// if (plane) scene.objects.push_back(plane);
 	if (cube) scene.objects.push_back(cube);
-	if (glock) scene.objects.push_back(glock);
-
-	scene.skybox = ResourceMgr::GetSkyboxByName("skybox");
-	scene.skybox->shader = ResourceMgr::GetShaderByName("skybox");
+	// scene.objects.push_back(glock);
 }
 
 void LoadAll() {
-	ResourceMgr::LoadSkybox("skybox", "assets/textures/sky/blowout/");
-	ResourceMgr::LoadShader("skybox", "Shaders/Skybox.vert", "Shaders/Skybox.frag");
+	ResourceMgr::LoadShader("sky", "Shaders/Sky.vert", "Shaders/Sky.frag");
 
 	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata/inconsolata_light.png",
 	                          "assets/fonts/inconsolata/inconsolata_light.json");
@@ -159,6 +165,9 @@ void LoadAll() {
 
 void RegisterCVars() {
 	CMDUtils::Register("sensitivity", "Mouse responsivity (Float)", g_config.sensitivity, 0, 10);
+
+	CMDUtils::Register("sky_cirrusDens", "Density of cirrus clouds", scene.sky->cirrusDensity);
+	CMDUtils::Register("sky_cumulusDens", "Density of cumulus clouds", scene.sky->cumulusDensity);
 
 	// --- Camera ---
 	CMDUtils::Register("cam_position", "Camera position (Vec3f)", scene.camera.position);
@@ -246,7 +255,7 @@ void RegisterCVars() {
 	));
 }
 
-void DrawDebug(const int fps, const float scale) {
+void DrawDebug(const int fps, const float scale, const float time) {
 	const MSDFText::FontPtr font = ResourceMgr::GetFontByName("inconsolata_light");
 
 	const std::vector debug_lines = {
@@ -254,6 +263,7 @@ void DrawDebug(const int fps, const float scale) {
 		std::format("{0:.2f} {1:.2f} {2:.2f}", scene.camera.position.x, scene.camera.position.y,
 		            scene.camera.position.z),
 		std::format("{:.3f}", g_config.fx_exposure),
+		std::format("Time: {:.3f}", time)
 	};
 
 	for (int i = 0; i < debug_lines.size(); i++) {
@@ -294,7 +304,7 @@ int main(int argc, char** argv) {
 		.r_fillColor = {0, 0, 0},
 
 		.con_fontScale = 32,
-		.con_maxVisibleLines = 20,
+		.con_maxVisibleLines = 30,
 		.con_backgroundColor = {0, 0, 0, 0.9},
 	};
 
@@ -304,22 +314,24 @@ int main(int argc, char** argv) {
 	// Log::SetSeverity(Logger::Severity::Info);
 	Camera::FPSCameraController cameraController(0.1f);
 
-
 	Renderer::Init();
 	LoadAll();
 	Input::Init();
 	Console::Init();
 	MSDFText::Init();
 	Backend::Init();
+	setupScene();
 	RegisterCVars();
 
-	// TODO make loading screen w/ progresbar
-	setupScene();
+	float timeOfDay = 13;
 
 	double lastTime = glfwGetTime();
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		const double dt = glfwGetTime() - lastTime;
 		lastTime = glfwGetTime();
+
+		timeOfDay += dt / 60;
+		timeOfDay = fmod(timeOfDay, 24);
 
 		// UPDATE
 		cameraController.update(scene.camera, dt);
@@ -327,20 +339,21 @@ int main(int argc, char** argv) {
 		updateControls();
 		Console::Update(dt);
 		Input::PollEvents(); // always should be updated last
+		scene.sky->update(timeOfDay);
 
 		// RENDER
 		Renderer::GenShadowMaps(scene);
 		Renderer::FrameBegin(scene);
-		Renderer::DrawSkybox(scene.skybox, scene.camera);
+		Renderer::DrawSky(scene.sky, scene.camera, timeOfDay);
 		for (const auto& object : scene.objects) {
 			if (object->name == "lightcube") object->transform.position = scene.pointLight.position;
 			if (object->name == "plane") object->transform.position = {scene.camera.position.x, 0, scene.camera.position.z};
 			if (object->drawable) object->draw();
 		}
-		Renderer::DrawSkybox(scene.skybox, scene.camera);
+
 		Renderer::ApplyPostProcess(dt);
 		Console::Draw();
-		DrawDebug(1 / dt, 32);
+		DrawDebug(1 / dt, 32, timeOfDay);
 		Renderer::FrameEnd();
 	}
 	Renderer::Shutdown();

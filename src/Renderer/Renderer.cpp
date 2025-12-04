@@ -321,6 +321,30 @@ namespace Renderer {
 		return 0.2126f * pixel[0] + 0.7152f * pixel[1] + 0.0722f * pixel[2];
 	}
 
+	void DrawSky(SkyPtr sky, const Camera::Camera& cam, float time) {
+		sky->shader->use();
+		sky->shader->setUniform1f("time", time);
+		sky->shader->setUniform3f("sunDir", sky->sunDir);
+		sky->shader->setUniform3f("sunColor", sky->sunColor);
+		sky->shader->setUniform1f("cirrus", sky->cirrusDensity);
+		sky->shader->setUniform1f("cumulus", sky->cumulusDensity);
+
+		glm::mat4 viewNoTrans = glm::mat4(glm::mat3(cam.viewMatrix));
+		glm::mat4 proj = cam.projectionMatrix;
+		sky->shader->setUniformMat4fv("u_View", false, viewNoTrans);
+		sky->shader->setUniformMat4fv("u_Projection", false, proj);
+
+		glDepthMask(GL_FALSE);
+		glDisable(GL_CULL_FACE);
+
+		glBindVertexArray(sky->VAO);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		glBindVertexArray(0);
+
+		glDepthMask(GL_TRUE);
+		glEnable(GL_CULL_FACE);
+	}
+
 	void FrameBegin(Scene& scene) {
 		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO); // draw everything in custom framebuffer
 
@@ -339,21 +363,6 @@ namespace Renderer {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
 	}
 
-	void DrawSkybox(SkyboxPtr sky, Camera::Camera cam) {
-		glDepthFunc(GL_LEQUAL);
-		sky->shader->use();
-		glm::mat4 view = glm::mat4(glm::mat3(cam.viewMatrix));
-		sky->shader->setUniformMat4fv("view", false, view);
-		sky->shader->setUniformMat4fv("projection", false, cam.projectionMatrix);
-
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-			glBindVertexArray(sky->VAO);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, sky->texture);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		glBindVertexArray(0);
-		glDepthFunc(GL_LESS);
-	}
 
 	void ApplyPostProcess(double dt) {
 		uint32_t bloom = sceneColorBufs[1];

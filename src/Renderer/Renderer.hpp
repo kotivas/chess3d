@@ -9,7 +9,7 @@
 #include "PostEffects/GaussianBlur.hpp"
 #include "../Game/Scene.hpp"
 #include "Shadow.hpp"
-#include "Skybox.hpp"
+#include "Sky.hpp"
 #include "Common/Color.hpp"
 
 
@@ -26,9 +26,7 @@ namespace Renderer {
 
 	// void UpdateShadowRes();
 	void UpdateRenderRes();
-
-	void DrawSkybox(SkyboxPtr sky, Camera::Camera cam);
-
+	void DrawSky(SkyPtr sky, const Camera::Camera& cam, float time);
 	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h);
 	void DrawRectOnScreen(float x, float y, float w, float h, const Color::rgba_t& color);
 
