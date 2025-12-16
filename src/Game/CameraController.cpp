@@ -1,7 +1,7 @@
 #include "CameraController.hpp"
 
 #include "Common/Config.hpp"
-#include "Ui/Console/Console.hpp"
+#include "UI/Console/Console.hpp"
 #include "Core/Logger.hpp"
 #include "Input/Input.hpp"
 

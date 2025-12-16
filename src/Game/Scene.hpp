@@ -7,11 +7,12 @@
 #include "Renderer/Sky.hpp"
 
 struct Scene {
-	std::vector<Renderer::DrawableObjectPtr> objects;
+	std::vector<std::shared_ptr<Renderer::Drawable>> objects;
 	Camera::Camera camera;
+	float time; // in seconds 24hours
 
 	Renderer::SkyPtr sky;
-	Renderer::DirLight dirLight;
-	Renderer::PointLight pointLight; // later vector
-	Renderer::SpotLight spotLight;
+	Renderer::DirLight dir_light;
+	Renderer::PointLight point_light; // later vector
+	Renderer::SpotLight spot_light;
 };

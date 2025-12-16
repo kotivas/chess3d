@@ -46,21 +46,22 @@ namespace Renderer::PostEffects {
 	}
 
 	uint32_t GaussianBlur::blur(const uint32_t& input, int passes) const {
-		bool horizontal = true;
-		ShaderPtr shader = ResourceMgr::GetShaderByName("GaussianBlur");
-		shader->use();
-		for (unsigned int i = 0; i < passes; i++) {
-			glBindFramebuffer(GL_FRAMEBUFFER, _pingpongFBO[horizontal]);
-			shader->setUniform1i("horizontal", horizontal);
-			glBindTexture(GL_TEXTURE_2D, i == 0 ? input : _pingpongBuffers[!horizontal]);
-
-			glBindVertexArray(_quadVAO);
-			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-			glBindVertexArray(0);
-			horizontal = !horizontal;
-		}
-
-		return _pingpongBuffers[!horizontal];
+		// bool horizontal = true;
+		// ShaderPtr shader = ResourceMgr::GetShaderByName("GaussianBlur");
+		// shader->use();
+		// for (unsigned int i = 0; i < passes; i++) {
+		// 	glBindFramebuffer(GL_FRAMEBUFFER, _pingpongFBO[horizontal]);
+		// 	shader->setUniform1i("horizontal", horizontal);
+		// 	glBindTexture(GL_TEXTURE_2D, i == 0 ? input : _pingpongBuffers[!horizontal]);
+		//
+		// 	glBindVertexArray(_quadVAO);
+		// 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		// 	glBindVertexArray(0);
+		// 	horizontal = !horizontal;
+		// }
+		//
+		// return _pingpongBuffers[!horizontal];
+		return 0;
 	}
 
 	GaussianBlur::~GaussianBlur() {

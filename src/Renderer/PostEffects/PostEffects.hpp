@@ -13,6 +13,7 @@ namespace Renderer::PostEffects {
 		const float targetExposure = EXP_WHITE / std::max(avgLuminance, 0.003f);
 		const float speed = targetExposure < exposure ? exposureSpeed : exposureSpeed * EXP_DARK_SPEED_FACTOR;
 		const float logExposure = std::lerp(std::log(exposure), std::log(targetExposure), speed);
-		return std::clamp(std::exp(logExposure), EXP_MIN, EXP_MAX);
+		const float exp = std::clamp(std::exp(logExposure), EXP_MIN, EXP_MAX);
+		return isnan(exp) ? 2.f : exp;
 	}
 }

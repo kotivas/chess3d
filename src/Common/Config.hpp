@@ -10,7 +10,7 @@ struct Config {
 	float sensitivity;
 
 	// --- SYSTEM ---
-	glm::ivec2 sys_windowResolution;
+	glm::u16vec2 sys_windowResolution;
 
 	// -- FX ---
 	bool fx_bloom;
@@ -29,11 +29,10 @@ struct Config {
 	// --- RENDER ---
 	int r_blurPasses;
 	float r_gamma;
-	glm::ivec2 r_resolution;
+	glm::u16vec2 r_resolution;
 	int r_shadowRes;
 	float r_renderDistance;
 	bool r_vsync;
-	Color::rgb_t r_fillColor;
 
 	// --- CONSOLE ---
 	float con_fontScale;

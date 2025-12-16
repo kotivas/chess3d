@@ -79,6 +79,23 @@ namespace ResourceMgr {
 		};
 	}
 
+	std::string getFileName(const std::string& fullPath) {
+		size_t pos1 = fullPath.find_last_of('/');
+		size_t pos2 = fullPath.find_last_of('\\');
+		size_t pos;
+
+		if (pos1 != std::string::npos && pos2 != std::string::npos)
+			pos = std::max(pos1, pos2);
+		else if (pos1 != std::string::npos)
+			pos = pos1;
+		else if (pos2 != std::string::npos)
+			pos = pos2;
+		else
+			return fullPath; // нет слэшей, возвращаем как есть
+
+		return fullPath.substr(pos + 1);
+	}
+
 	Renderer::MaterialPtr ProcessMaterial(aiMaterial* aiMaterial, const std::string& directory) {
 		Renderer::MaterialPtr nmat = std::make_shared<Renderer::Material>();
 
@@ -92,25 +109,34 @@ namespace ResourceMgr {
 
 		aiString diffuseTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexPath) == AI_SUCCESS) {
-			nmat->diffuse[0] = CreateTexture(directory + diffuseTexPath.C_Str());
+			nmat->diffuse = CreateTexture2D(directory + getFileName(diffuseTexPath.C_Str()),
+			                                Renderer::TextureWrapMode::ClampToEdge);
+			nmat->useDiffuse = true;
 		} else {
-			Log::Warning("No diffuse texture for material: {0}", nmat->name);
-			nmat->diffuse[0] = CreateDefaultTexture({0, 0, 0}, {255, 0, 255});
+			std::string texpath = diffuseTexPath.C_Str();
+			Log::Warning("Unable to find material {0} diffuse texture at {1}", nmat->name, texpath);
+			nmat->solidColor = {0.5, 0.0, 1.0};
 		}
 
 		aiString specularTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_SPECULAR, 0, &specularTexPath) == AI_SUCCESS) {
-			nmat->specular[0] = CreateTexture(directory + specularTexPath.C_Str());
+			nmat->specular = CreateTexture2D(directory + getFileName(specularTexPath.C_Str()),
+			                                 Renderer::TextureWrapMode::ClampToEdge);
+			nmat->useSpecular = true;
 		}
 
 		aiString normalTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &normalTexPath) == AI_SUCCESS) {
-			nmat->normal[0] = CreateTexture(directory + normalTexPath.C_Str());
+			nmat->normal = CreateTexture2D(directory + getFileName(normalTexPath.C_Str()),
+			                               Renderer::TextureWrapMode::ClampToEdge);
+			nmat->useNormal = true;
 		}
 
 		aiString heightTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_HEIGHT, 0, &heightTexPath) == AI_SUCCESS) {
-			nmat->normal[0] = CreateTexture(directory + heightTexPath.C_Str());
+			nmat->normal = CreateTexture2D(directory + getFileName(heightTexPath.C_Str()),
+			                               Renderer::TextureWrapMode::ClampToEdge);
+			nmat->useNormal = true;
 		}
 
 		return nmat;
@@ -149,7 +175,7 @@ namespace ResourceMgr {
 		for (int i = 0; i < node->mNumChildren; i++) ProcessNode(node->mChildren[i], scene, global_transform, model);
 	}
 
-	bool LoadModel(const std::string& name, const std::string& path, Renderer::ShaderPtr shader) {
+	bool LoadModel(const std::string& name, const std::string& path, AssetManager::ShaderHandle shader) {
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(
 			path, aiProcess_Triangulate |

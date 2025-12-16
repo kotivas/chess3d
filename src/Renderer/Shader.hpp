@@ -1,26 +1,19 @@
 #pragma once
 
 #include <string>
-#include <glad/glad.h>
-
 #include <glm/glm.hpp>
-#include "glm/gtc/matrix_transform.hpp"
-#include <glm/gtc/type_ptr.hpp>
-
-#include "../Game/Camera.hpp"
-#include "Light.hpp"
-
 #include <memory>
-
 #include "Common/Color.hpp"
 
 namespace Renderer {
-	struct Shader {
+	class Shader {
+	public:
 		Shader();
+		Shader(uint16_t id);
 
-		void use();
+		void use() const;
 
-		GLuint getID() const;
+		uint16_t& getId();
 
 		void setUniform1i(const std::string& name, int v0) const;
 		void setUniform2i(const std::string& name, int v0, int v1) const;
@@ -31,15 +24,15 @@ namespace Renderer {
 		void setUniform2f(const std::string& name, glm::vec2 v) const;
 		void setUniform3f(const std::string& name, float v0, float v1, float v2) const;
 		void setUniform3f(const std::string& name, glm::vec3 v) const;
-		void setUniform3f(const std::string& name, const Color::rgb_t& c);
+		void setUniform3f(const std::string& name, Color::rgb_t c) const;
 		void setUniform4f(const std::string& name, float v0, float v1, float v2, float v3) const;
 		void setUniform4f(const std::string& name, glm::vec4 v) const;
-		void setUniform4f(const std::string& name, const Color::rgba_t& c) const;
-		void setUniformMat4fv(const std::string& name, GLboolean transpose, glm::mat4& value) const;
+		void setUniform4f(const std::string& name, Color::rgba_t c) const;
+		void setUniformMat4fv(const std::string& name, bool transpose, glm::mat4 value) const;
 
+		~Shader();
 
-		GLuint _id;
+	private:
+		uint16_t _id;
 	};
-
-	using ShaderPtr = std::shared_ptr<Shader>;
 }

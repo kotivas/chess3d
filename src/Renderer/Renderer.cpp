@@ -2,15 +2,18 @@
 
 #include "Common/Utils.hpp"
 #include "Common/Config.hpp"
+#include "Common/GlUtils.hpp"
 #include "Core/Logger.hpp"
 #include "PostEffects/PostEffects.hpp"
 #include "ResourceMgr/ResourceMgr.hpp"
+#include "UI/Console/Console.hpp"
 
 namespace Renderer {
+	GLuint msdfvao, msdfvbo;
+
 	void Init() {
 		sceneFBO = 0;
 		RBO = 0;
-		UBOMatrices = 0;
 		quadVAO = 0;
 		quadVBO = 0;
 		sceneColorBufs[0] = 0;
@@ -18,44 +21,46 @@ namespace Renderer {
 		screenColorBuf = 0;
 		screenFBO = 0;
 
-		InitGLFW();
+		quadShader = AssetManager::g_ShaderManager.getHandle("screenfbo");
+		if (!quadShader) Log::Warning("Unable to get handle of shader screenfbo");
+		solidShader = AssetManager::g_ShaderManager.getHandle("solidcolor");
+		if (!solidShader) Log::Warning("Unable to get handle of shader solidcolor");
+		textureShader = AssetManager::g_ShaderManager.getHandle("texture");
+		if (!textureShader) Log::Warning("Unable to get handle of shader texture");
+		postfxShader = AssetManager::g_ShaderManager.getHandle("postfx");
+		if (!postfxShader) Log::Warning("Unable to get handle of shader postfx");
+		msdfTextShader = AssetManager::g_ShaderManager.getHandle("msdf");
+		if (!msdfTextShader) Log::Warning("Unable to get handle of shader msdf");
 
+		SetGlDebugCallback(GlUtils::glDebugOutput);
+
+		CreateSceneFBO();
+		CreateScreenFBO();
+		CreateQuadVAO();
+
+		blur.init(g_config.r_resolution.x, g_config.r_resolution.y, quadVAO, quadVBO);
+		shadowPass.init();
+		shadowPass.addPointShadow();
+		lightPass.init();
+
+		glGenVertexArrays(1, &msdfvao);
+		glGenBuffers(1, &msdfvbo);
+	}
+
+	bool SetGlDebugCallback(GLDEBUGPROC fn) {
 		int flags;
 		glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
 		if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
 			glEnable(GL_DEBUG_OUTPUT);
 			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-			glDebugMessageCallback(Utils::glDebugOutput, nullptr);
+			glDebugMessageCallback(fn, nullptr);
+			return true;
 		}
-
-		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
-
-		glEnable(GL_DEPTH_TEST);
-
-		glEnable(GL_CULL_FACE); // Включаем отсечение задних граней
-		glCullFace(GL_BACK); // Указываем, какие грани отсекать (задние)
-		glFrontFace(GL_CCW); // Указываем порядок вершин для лицевых граней (CCW по умолчанию)
-
-		// work with shadows
-		pointShadow.resolution = g_config.r_shadowRes;
-		pointShadow.generate();
-
-		spotShadow.resolution = g_config.r_shadowRes; // todo maybe i should split it
-		spotShadow.generate();
-
-		dirShadow.resolution = g_config.r_shadowRes;
-		dirShadow.generate();
-
-		CreateSceneFBO();
-		CreateScreenFBO();
-		CreateQuadVAO();
-		CreateUBO();
-
-		blur.init(g_config.r_resolution.x, g_config.r_resolution.y, quadVAO, quadVBO);
+		Log::Warning("Unable to set opengl debug callback");
+		return false;
 	}
 
-
-	void InitGLFW() {
+	void GlInit() {
 		// Init GLFW
 		glfwInit();
 		// Set all the required options for GLFW
@@ -126,9 +131,7 @@ namespace Renderer {
 	}
 
 	void CreateQuadVAO() {
-		// Вершины квадрата
 		float quadVertices[] = {
-			// vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
 			// positions   // texCoords
 			-1.0f, 1.0f, 0.0f, 1.0f,
 			-1.0f, -1.0f, 0.0f, 0.0f,
@@ -150,41 +153,8 @@ namespace Renderer {
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 	}
 
-	void CreateUBO() {
-		// ====== MATRICES ======
-		glGenBuffers(1, &UBOMatrices);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
-		glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, 4 * sizeof(glm::mat4));
-		// ====== LIGHTS ======
-		glGenBuffers(1, &UBOLights);
-
-		static_assert(sizeof(DirLight) == 80);
-		static_assert(sizeof(PointLight) == 96);
-		static_assert(sizeof(SpotLight) == 112);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(DirLight) + sizeof(PointLight) + sizeof(SpotLight), NULL,
-		             GL_STATIC_DRAW);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, UBOLights, 0,
-		                  sizeof(DirLight) + sizeof(PointLight) + sizeof(SpotLight));
-		// ====== DATA ======
-		glGenBuffers(1, &UBOData);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOData);
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec3) + sizeof(float), NULL, GL_STATIC_DRAW);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-		glBindBufferRange(GL_UNIFORM_BUFFER, 2, UBOData, 0, sizeof(glm::vec3) + sizeof(float));
-	}
-
 	void RenderClear() {
-		glClearColor(g_config.r_fillColor.r, g_config.r_fillColor.g, g_config.r_fillColor.b, 1.0f);
+		glClearColor(0, 0, 0, 1.0f);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, screenFBO);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -192,147 +162,39 @@ namespace Renderer {
 		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
-
-	void UpdateUBOMatrices(const glm::mat4& projection, const glm::mat4& view,
-	                       const glm::mat4& dirLightSpaceMatrix, const glm::mat4& spotLightSpaceMatrix) {
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
-
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-		glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4),
-		                glm::value_ptr(dirLightSpaceMatrix));
-		glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), sizeof(glm::mat4),
-		                glm::value_ptr(spotLightSpaceMatrix));
-
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	}
-
-	void UpdateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight) {
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
-
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(DirLight), &dirLight);
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(DirLight), sizeof(PointLight), &pointLight);
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(DirLight) + sizeof(PointLight), sizeof(spotLight), &spotLight);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	}
-
-	void UpdateUBOData(const glm::vec3& viewPos) {
-		glBindBuffer(GL_UNIFORM_BUFFER, UBOData);
-
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(viewPos), glm::value_ptr(viewPos));
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec3), sizeof(float), &g_config.r_renderDistance);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	}
-
-	void GenShadowMaps(Scene& scene) {
-		glCullFace(GL_FRONT);
-
-		// light space matrix for directional light
-
-		if (scene.dirLight.enable) {
-			dirShadow.calculateLightSpaceMatrix(scene.dirLight.direction, 0.1f, g_config.r_renderDistance);
-
-			// render scene from light's point of view
-			glViewport(0, 0, dirShadow.resolution, dirShadow.resolution);
-			glBindFramebuffer(GL_FRAMEBUFFER, dirShadow.shadowMapFBO);
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			ResourceMgr::GetShaderByName("depth")->use();
-			ResourceMgr::GetShaderByName("depth")->setUniformMat4fv("u_LightSpaceMatrix", false,
-			                                                        dirShadow.lightSpaceMatrix);
-
-			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("depth"));
-			}
-		}
-		if (scene.spotLight.enable) {
-			spotShadow.calculateLightSpaceMatrix(scene.spotLight.position, scene.spotLight.direction,
-			                                     scene.spotLight.outerCutOff, 0.1f, g_config.r_renderDistance);
-
-			// render scene from light's point of view
-			glViewport(0, 0, spotShadow.resolution, spotShadow.resolution);
-			glBindFramebuffer(GL_FRAMEBUFFER, spotShadow.shadowMapFBO);
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			ResourceMgr::GetShaderByName("depth")->use();
-			ResourceMgr::GetShaderByName("depth")->setUniformMat4fv("u_LightSpaceMatrix", false,
-			                                                        spotShadow.lightSpaceMatrix);
-
-			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("depth"));
-			}
-		}
-		if (scene.pointLight.enable) {
-			pointShadow.genTransformMatrixes(scene.pointLight.position, scene.camera.nearPlane, scene.camera.farPlane);
-
-			// render scene from light's point of view
-			glViewport(0, 0, pointShadow.resolution, pointShadow.resolution);
-			glBindFramebuffer(GL_FRAMEBUFFER, pointShadow.shadowCubemapFBO);
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			ResourceMgr::GetShaderByName("point_shadow_depth")->use();
-
-			// TODO возможно я могу как то сделать, что бы за раз передавать 6 матриц
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
-				"shadowMatrices[0]", false, pointShadow.transforms[0]);
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
-				"shadowMatrices[1]", false, pointShadow.transforms[1]);
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
-				"shadowMatrices[2]", false, pointShadow.transforms[2]);
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
-				"shadowMatrices[3]", false, pointShadow.transforms[3]);
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
-				"shadowMatrices[4]", false, pointShadow.transforms[4]);
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniformMat4fv(
-				"shadowMatrices[5]", false, pointShadow.transforms[5]);
-
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform1f("far_plane", scene.camera.farPlane);
-			ResourceMgr::GetShaderByName("point_shadow_depth")->setUniform3f("lightPos", scene.pointLight.position);
-
-			for (auto& object : scene.objects) {
-				if (object->castShadow) object->draw(ResourceMgr::GetShaderByName("point_shadow_depth"));
-			}
-
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		// reset viewport
-		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glCullFace(GL_BACK);
-	}
-
 
 	float GetSceneAvgLuminance() {
 		glBindTexture(GL_TEXTURE_2D, sceneColorBufs[0]);
 		glGenerateMipmap(GL_TEXTURE_2D);
 
-		const int mipLevel = (int)std::log2(std::max(g_config.r_resolution.x, g_config.r_resolution.y));
+		// int mip_level = std::bit_width(std::max(g_config.r_resolution.x, g_config.r_resolution.y)) - 1; // for 1920x1080 mip level is 10
 		float pixel[3] = {0.0f, 0.0f, 0.0f};
-		glGetTexImage(GL_TEXTURE_2D, mipLevel, GL_RGB, GL_FLOAT, &pixel);
+		glGetTexImage(GL_TEXTURE_2D, 10, GL_RGB, GL_FLOAT, &pixel);
 
 		return 0.2126f * pixel[0] + 0.7152f * pixel[1] + 0.0722f * pixel[2];
 	}
 
 	void DrawSky(SkyPtr sky, const Camera::Camera& cam, float time) {
-		sky->shader->use();
-		sky->shader->setUniform1f("time", time);
-		sky->shader->setUniform3f("sunDir", sky->sunDir);
-		sky->shader->setUniform3f("sunColor", sky->sunColor);
-		sky->shader->setUniform1f("cirrus", sky->cirrusDensity);
-		sky->shader->setUniform1f("cumulus", sky->cumulusDensity);
+		Shader* shader = AssetManager::g_ShaderManager.get(sky->shader);
+
+		shader->use();
+
+		shader->setUniform1f("uTime", time);
+		shader->setUniform3f("uSunDirection", sky->sunDir);
+		shader->setUniform3f("uSunColor", sky->sunColor);
+		shader->setUniform1f("uCirrus", sky->cirrusDensity);
+		shader->setUniform1f("uCumulus", sky->cumulusDensity);
+		shader->setUniform2f("uWindDirection", glm::vec2(1.0, 1.0));
 
 		glm::mat4 viewNoTrans = glm::mat4(glm::mat3(cam.viewMatrix));
-		glm::mat4 proj = cam.projectionMatrix;
-		sky->shader->setUniformMat4fv("u_View", false, viewNoTrans);
-		sky->shader->setUniformMat4fv("u_Projection", false, proj);
+		shader->setUniformMat4fv("uView", false, viewNoTrans);
+		shader->setUniformMat4fv("uProjection", false, cam.projectionMatrix);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_3D, ResourceMgr::GetTextureByName("noise3d"));
+		shader->setUniform1i("tNoise", 0);
 
 		glDepthMask(GL_FALSE);
 		glDisable(GL_CULL_FACE);
@@ -341,28 +203,102 @@ namespace Renderer {
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		glBindVertexArray(0);
 
+		glBindTexture(GL_TEXTURE_3D, 0);
+
 		glDepthMask(GL_TRUE);
 		glEnable(GL_CULL_FACE);
 	}
 
-	void FrameBegin(Scene& scene) {
-		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO); // draw everything in custom framebuffer
+	void DrawDebug(int fps, float scale, float time, glm::vec3 cam_pos) {
+		const MSDFText::FontPtr font = ResourceMgr::GetFontByName("inconsolata_light");
+		const std::vector debug_lines = {
+			"FPS: " + std::to_string(fps),
+			std::format("Cam pos: {0:.2f} {1:.2f} {2:.2f}", cam_pos.x, cam_pos.y, cam_pos.z),
+			std::format("Exp: {:.3f}", g_config.fx_exposure),
+			std::format("Time: {:.1f}", time)
+		};
 
-		UpdateUBOLights(scene.dirLight, scene.pointLight, scene.spotLight);
-		UpdateUBOData(scene.camera.position);
-		UpdateUBOMatrices(scene.camera.projectionMatrix, scene.camera.viewMatrix,
-		                  dirShadow.lightSpaceMatrix, spotShadow.lightSpaceMatrix);
+		for (int i = 0; i < debug_lines.size(); i++) {
+			const float lineHeight = font->lineHeight * scale;
+			float x = g_config.r_resolution.x - font->getStringWidth(debug_lines[i], scale);
+			float y = g_config.r_resolution.y - lineHeight - i * lineHeight;
 
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, dirShadow.shadowMap);
-
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, spotShadow.shadowMap);
-
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, pointShadow.shadowCubemap);
+			DrawText({
+				debug_lines[i],
+				scale,
+				{x, y},
+				{Color::WHITE, 1},
+				font
+			});
+		}
 	}
 
+	void GenerateRenderItem(const std::shared_ptr<Drawable>& drawable, std::vector<RenderItem>& items) {
+		if (drawable->type == Drawable::Mesh) {
+			MeshPtr mesh = std::dynamic_pointer_cast<Mesh>(drawable);
+			items.emplace_back(mesh, mesh->material, mesh->transform.getMatrix());
+		} else if (drawable->type == Drawable::Model) {
+			auto model = std::dynamic_pointer_cast<Model>(drawable);
+			for (const auto& mesh : model->meshes)
+				items.emplace_back(mesh, mesh->material, model->transform.getMatrix() * mesh->transform.getMatrix());
+		}
+	}
+
+	void Render(Scene& scene, double dt) {
+		RenderClear();
+
+		RenderContext ctx{
+			// OPTIMIZE do not use whole scene var
+			.near = scene.camera.nearPlane,
+			.far = scene.camera.farPlane,
+			.render_width = g_config.r_resolution.x,
+			.render_height = g_config.r_resolution.y,
+			.scene = scene,
+			.target_fbo = sceneFBO,
+		};
+		for (const auto& drawable : scene.objects) {
+			if (drawable->drawable) GenerateRenderItem(drawable, ctx.render_items);
+		}
+
+		shadowPass.pass(ctx);
+
+		ctx.target_fbo = sceneFBO;
+		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
+		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+		DrawSky(scene.sky, scene.camera, scene.time); // todo SkyPass
+
+		lightPass.pass(ctx);
+
+		glDisable(GL_CULL_FACE);
+
+		ApplyPostProcess(dt); // todo PostFxPass
+		// todo UIPass (UiElements)
+		Console::Draw();
+		DrawDebug(int(1 / dt), 25, scene.time, scene.camera.position);
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+
+		// OUTPUT TO THE 0 BUFFER
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glDisable(GL_DEPTH_TEST);
+		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
+
+		AssetManager::g_ShaderManager.get(quadShader)->use();
+		AssetManager::g_ShaderManager.get(quadShader)->setUniform1i("texture0", 0);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, screenColorBuf);
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+
+		glEnable(GL_DEPTH_TEST);
+		glfwSwapBuffers(g_window);
+	}
 
 	void ApplyPostProcess(double dt) {
 		uint32_t bloom = sceneColorBufs[1];
@@ -377,26 +313,26 @@ namespace Renderer {
 		glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
 		glBindFramebuffer(GL_FRAMEBUFFER, screenFBO);
 
-		Renderer::ShaderPtr postfxShader = ResourceMgr::GetShaderByName("postfx");
+		Shader* shader = AssetManager::g_ShaderManager.get(postfxShader);
 
-		postfxShader->use();
+		shader->use();
 
-		postfxShader->setUniform2f("resolution", g_config.sys_windowResolution);
-		postfxShader->setUniform1f("time", glfwGetTime());
+		shader->setUniform2f("resolution", g_config.sys_windowResolution);
+		shader->setUniform1f("time", glfwGetTime());
 
-		postfxShader->setUniform1i("effects.bloom", g_config.fx_bloom);
-		postfxShader->setUniform1f("effects.gamma", g_config.r_gamma);
-		postfxShader->setUniform1f("effects.chromaticOffset", g_config.fx_chromaticOffset);
-		postfxShader->setUniform1i("effects.quantization", g_config.fx_quantization);
-		postfxShader->setUniform1i("effects.quantizationLevel", g_config.fx_quantizationLevel);
-		postfxShader->setUniform1i("effects.vignette", g_config.fx_vignette);
-		postfxShader->setUniform1f("effects.vignetteIntensity", g_config.fx_vignetteIntensity);
-		postfxShader->setUniform3f("effects.vignetteColor", g_config.fx_vignetteColor);
-		postfxShader->setUniform1f("effects.exposure", g_config.fx_exposure);
-		postfxShader->setUniform1f("effects.saturation", g_config.fx_saturation);
+		shader->setUniform1i("effects.bloom", g_config.fx_bloom);
+		shader->setUniform1f("effects.gamma", g_config.r_gamma);
+		shader->setUniform1f("effects.chromaticOffset", g_config.fx_chromaticOffset);
+		shader->setUniform1i("effects.quantization", g_config.fx_quantization);
+		shader->setUniform1i("effects.quantizationLevel", g_config.fx_quantizationLevel);
+		shader->setUniform1i("effects.vignette", g_config.fx_vignette);
+		shader->setUniform1f("effects.vignetteIntensity", g_config.fx_vignetteIntensity);
+		shader->setUniform3f("effects.vignetteColor", g_config.fx_vignetteColor);
+		shader->setUniform1f("effects.exposure", g_config.fx_exposure);
+		shader->setUniform1f("effects.saturation", g_config.fx_saturation);
 
-		postfxShader->setUniform1i("screenTexture", 0);
-		postfxShader->setUniform1i("bloomBlur", 1);
+		shader->setUniform1i("screenTexture", 0);
+		shader->setUniform1i("bloomBlur", 1);
 
 		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
 		glActiveTexture(GL_TEXTURE0);
@@ -409,29 +345,86 @@ namespace Renderer {
 		glEnable(GL_DEPTH_TEST);
 	}
 
-	void FrameEnd() {
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glDisable(GL_DEPTH_TEST);
-		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
+	void DrawText(const MSDFText::Text& text) {
+		struct Vtx {
+			float x, y, u, v;
+		};
 
-		ResourceMgr::GetShaderByName("screenfbo")->use();
-		ResourceMgr::GetShaderByName("screenfbo")->setUniform1i("texture0", 0);
+		if (!text.font) return;
+
+		std::vector<Vtx> verts;
+		verts.reserve(text.string.size() * 6);
+
+		float penX = text.position.x;
+		float penY = text.position.y; // baseline offset (≈ ascender)
+
+		for (const char cc : text.string) {
+			const MSDFText::Glyph& g = text.font->getGlyph(cc);
+
+			float gx0 = penX + g.planeLeft * text.scale;
+			float gy0 = penY + g.planeBottom * text.scale;
+			float gx1 = penX + g.planeRight * text.scale;
+			float gy1 = penY + g.planeTop * text.scale;
+
+			float u0 = g.uvLeft;
+			float v0 = g.uvBottom;
+			float u1 = g.uvRight;
+			float v1 = g.uvTop;
+
+			verts.push_back({gx0, gy0, u0, v0});
+			verts.push_back({gx1, gy0, u1, v0});
+			verts.push_back({gx1, gy1, u1, v1});
+			verts.push_back({gx1, gy1, u1, v1});
+			verts.push_back({gx0, gy1, u0, v1});
+			verts.push_back({gx0, gy0, u0, v0});
+
+			penX += g.advance * text.scale;
+		}
+
+		if (verts.empty()) return;
+
+		glDisable(GL_DEPTH_TEST);
+		glBindVertexArray(msdfvao);
+		glBindBuffer(GL_ARRAY_BUFFER, msdfvbo);
+		glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(Vtx), verts.data(), GL_DYNAMIC_DRAW);
+
+		GLint posLoc = 0;
+		GLint uvLoc = 1;
+		glEnableVertexAttribArray(posLoc);
+		glVertexAttribPointer(posLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Vtx), (void*)0);
+		glEnableVertexAttribArray(uvLoc);
+		glVertexAttribPointer(uvLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Vtx), (void*)(2 * sizeof(float)));
+
+		Shader* shader = AssetManager::g_ShaderManager.get(msdfTextShader);
+
+		shader->use();
+
+		glm::mat4 proj = glm::ortho(0.0f, static_cast<float>(g_config.r_resolution.x), 0.0f,
+		                            static_cast<float>(g_config.r_resolution.y));
+
+		shader->setUniformMat4fv("uProjection", false, proj);
+		shader->setUniform4f("uColor", text.color.r, text.color.g, text.color.b, text.color.a);
+		shader->setUniform1f("uScale", text.scale);
+		shader->setUniform1f("uPxRange", text.font->distanceRange);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, screenColorBuf);
+		glBindTexture(GL_TEXTURE_2D, text.font->atlas);
+		shader->setUniform1i("uAtlas", 0);
 
-		glBindVertexArray(quadVAO);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		glDrawArrays(GL_TRIANGLES, 0, (GLsizei)verts.size());
+
+		glDisableVertexAttribArray(posLoc);
+		glDisableVertexAttribArray(uvLoc);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindVertexArray(0);
-
 		glEnable(GL_DEPTH_TEST);
-
-		RenderClear();
-		glfwSwapBuffers(g_window);
 	}
 
 	void DrawRectOnScreen(float x, float y, float w, float h, const Color::rgba_t& color) {
-		Renderer::ShaderPtr shader = ResourceMgr::GetShaderByName("solidcolor");
+		Shader* shader = AssetManager::g_ShaderManager.get(solidShader);
 
 		shader->use();
 
@@ -460,11 +453,10 @@ namespace Renderer {
 	}
 
 	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h) {
-		Renderer::ShaderPtr shader = ResourceMgr::GetShaderByName("texture");
+		Shader* shader = AssetManager::g_ShaderManager.get(textureShader);
 
 		shader->use();
 
-		// Устанавливаем матрицу модели
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(x, y, 0.0f));
 		model = glm::scale(model, glm::vec3(w, h, 1.0f));
@@ -490,6 +482,7 @@ namespace Renderer {
 	}
 
 	void Shutdown() {
+		// todo delete all fbo, rbo and textures
 		glDeleteFramebuffers(1, &screenFBO);
 		glDeleteTextures(1, &screenColorBuf);
 

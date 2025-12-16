@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.14)
+﻿cmake_minimum_required(VERSION 3.20)
 project(chess3d C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -12,51 +12,37 @@ find_package(assimp REQUIRED)
 find_package(rapidjson REQUIRED)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-	set(CMAKE_CXX_FLAGS_DEBUG "/MDd /ZI /Ob0 /Od /RTC1")
-endif()
+    set(CMAKE_CXX_FLAGS_DEBUG "/MDd /ZI /Ob0 /Od /RTC1")
+endif ()
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
-set(SOURCE 
-		src/main.cpp
-
-		src/Common/Utils.cpp
-		src/Common/Config.cpp
-
-		src/Renderer/Shader.cpp
-		src/Renderer/Renderer.cpp
-		src/Renderer/Model.cpp
-		src/Renderer/Shadow.cpp
-		src/Renderer/PostEffects/GaussianBlur.cpp
-
-		src/Game/Game.cpp
-		src/Game/CameraController.cpp
-
-		src/Input/Input.cpp
+set(SOURCE
+        src/main.cpp
+        src/Common/Utils.cpp
+        src/Common/GlUtils.cpp
+        src/Common/Config.cpp
+        src/Renderer/Shader.cpp
+        src/Renderer/Renderer.cpp
+        src/Renderer/Model.cpp
+        src/Renderer/PostEffects/GaussianBlur.cpp
+        src/Game/Game.cpp
+        src/Game/CameraController.cpp
+        src/Input/Input.cpp
         src/UI/Console/Console.cpp
         src/UI/Text/MSDFText.cpp
-
-		src/ResourceMgr/ResourceMgr.cpp
-		src/ResourceMgr/ResourceMgrModel.cpp
-		src/ResourceMgr/ResourceMgrShader.cpp
-
-		src/Core/Logger.cpp
-		src/Core/CMDUtils.cpp
-		src/Core/Backend.cpp
+        src/ResourceMgr/ResourceMgr.cpp
+        src/ResourceMgr/ResourceMgrModel.cpp
+        src/Core/Logger.cpp
+        src/Core/CMDUtils.cpp
+        src/Core/Backend.cpp
+        src/AssetManager/ShaderManager.cpp
+        src/Renderer/RenderPasses/ShadowPass.cpp
+        src/Renderer/RenderPasses/LightningPass.cpp
+        src/Renderer/RenderPasses/UiPass.cpp
 )
 
-add_executable(chess3d ${SOURCE} )
-add_custom_command(
-	TARGET chess3d POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-	"${CMAKE_SOURCE_DIR}/assets"
-	"${CMAKE_BINARY_DIR}/assets" )
-
-add_custom_command(
-	TARGET chess3d POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-	"${CMAKE_SOURCE_DIR}/src/Renderer/Shaders"
-	"${CMAKE_BINARY_DIR}/Shaders" )
+add_executable(chess3d ${SOURCE})
 
 target_include_directories(chess3d PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(chess3d PRIVATE OpenGL::GL glad::glad glfw glm::glm assimp::assimp rapidjson)

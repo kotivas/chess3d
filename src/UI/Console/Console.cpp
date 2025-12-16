@@ -39,14 +39,17 @@ namespace Console {
 	void ExecuteCommand(const std::string& command) {
 		if (command.empty())
 			return;
+		Print(Color::WHITE, "> " + command);
 
 		std::istringstream iss(command);
 		std::string name;
+		std::string value;
 
-		Print(Color::WHITE, "> " + command);
+		iss >> name;
+		iss >> value;
 
 		// Parse command name and optional value
-		if (!(iss >> name)) {
+		if (name.empty()) {
 			Log::Error("invalid command syntax");
 			return;
 		}
@@ -65,12 +68,16 @@ namespace Console {
 			}
 			return;
 		}
-
 		if (name == "status") {
 			Print(Color::WHITE,
 			      "VirtMem usage (MB): " + std::to_string(float(Backend::VirtMemoryUsage()) / 8.f / 1024.f / 1024.f));
 			Print(Color::WHITE, "CPU usage (%) " + std::to_string(Backend::CpuUsage()));
 
+			return;
+		}
+		if (name == "reload_shader") {
+			if (!value.empty()) AssetManager::g_ShaderManager.reload(value);
+			else Log::Warning("reload_shader <shader name>");
 			return;
 		}
 
@@ -81,8 +88,7 @@ namespace Console {
 			return;
 		}
 
-		std::string value_str;
-		if (!(iss >> value_str)) {
+		if (value.empty()) {
 			Print(Color::WHITE,
 			      std::format("{0} = {1} \n - {2} (def <{3}>, min <{4}>, max <{5}>)", name,
 			                  CMDUtils::ToString(cvar->val), cvar->desc,
@@ -166,16 +172,19 @@ namespace Console {
 		const float lineyzero = g_config.r_resolution.y - lineHeight;
 
 		const float leftIndent = 5;
-		const float height = lineHeight * (maxVisibleLines + 1) - (font->descender * fontScale)*2;
+		const float height = lineHeight * (maxVisibleLines + 1) - (font->descender * fontScale) * 2;
 		const float width = g_config.r_resolution.x - leftIndent;
 
 		Renderer::DrawRectOnScreen(0, 0, width + leftIndent, height, g_config.con_backgroundColor);
 		Renderer::DrawRectOnScreen(0, height, width + leftIndent, 1, {Color::YELLOW, 1});
-		//
-		// STER 0 --------------------------------- draw input field
-		MSDFText::DrawText("> " + g_inputField, font, leftIndent,
-		                   lineyzero - maxVisibleLines * lineHeight, fontScale,
-		                   {Color::WHITE, 1});
+
+		Renderer::DrawText({
+			"> " + g_inputField,
+			fontScale,
+			{leftIndent, lineyzero - maxVisibleLines * lineHeight},
+			{Color::WHITE, 1},
+			font
+		});
 
 		if (g_messages.empty()) return;
 		// STEP 1 --------------------------------- get visible messages vector
@@ -212,8 +221,11 @@ namespace Console {
 		// STEP 3 --------------------------------- rendering text
 
 		for (int i = 0; i < line_boxes.size(); i++) {
-			MSDFText::DrawText(line_boxes[i].text, font, leftIndent, lineyzero - i * lineHeight, fontScale,
-			                   {line_boxes[i].color, 1});
+			// MSDFText::DrawText(line_boxes[i].text, font, leftIndent, lineyzero - i * lineHeight, fontScale,
+			// {line_boxes[i].color, 1});
+			Renderer::DrawText({
+				line_boxes[i].text, fontScale, {leftIndent, lineyzero - i * lineHeight}, {line_boxes[i].color, 1}, font
+			});
 		}
 	}
 

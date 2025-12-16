@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <iostream>
+#include "Renderer/Material.hpp"
 
 #include "Shader.hpp"
 
@@ -31,55 +32,32 @@ namespace Renderer {
 		}
 	};
 
-	struct Material {
-		std::string name;
-
-		uint32_t diffuse[3];
-		uint32_t specular[3];
-		uint32_t normal[3];
-
-		float shininess{0};
-		ShaderPtr shader;
-		glm::vec3 solidColor;
-		bool useSolidColor{false};
-		//GLuint ior;       // index of refraction
-		//GLuint dissolve;  // 1 == opaque; 0 == fully transparent
-		void apply() const;
-	};
-
-	using MaterialPtr = std::shared_ptr<Material>;
-
-	class DrawableObject {
+	class Drawable {
 	public:
-		DrawableObject(const std::string& name)
+		Drawable(const std::string& name)
 			: drawable(true), name(name) {
 		}
 
-		virtual void draw(const Transform3d& model = {}) = 0;
-		virtual void draw(const ShaderPtr& shader, const Transform3d& model = {}) = 0;
+		enum Type {Mesh, Model} type;
 
 		bool drawable;
 		std::string name;
 		Transform3d transform;
 		bool castShadow{true};
 
-		virtual ~DrawableObject() = default;
+		virtual ~Drawable() = default;
 	};
 
-	using DrawableObjectPtr = std::shared_ptr<DrawableObject>;
-
-	class Mesh final : public DrawableObject {
+	class Mesh final : public Drawable {
 	public:
-		Mesh(const std::string& name = "undefined") : DrawableObject(name), VBO(0), VAO(0), EBO(0) {
+		Mesh(const std::string& name = "undefined") : Drawable(name), VBO(0), VAO(0), EBO(0) {
+			type = Drawable::Mesh;
 		}
 
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
 		uint32_t VBO, VAO, EBO;
 		MaterialPtr material;
-
-		void draw(const Transform3d& model = {}) override;
-		void draw(const ShaderPtr& shader, const Transform3d& model) override;
 
 		void setup();
 
@@ -88,17 +66,16 @@ namespace Renderer {
 
 	using MeshPtr = std::shared_ptr<Mesh>;
 
-	class Model final : public DrawableObject {
+	class Model final : public Drawable {
 	public:
 		Model(const std::string& name = "undefined")
-			: DrawableObject(name) {
+			: Drawable(name) {
+			type = Drawable::Model;
 		}
 
 		[[nodiscard]] MeshPtr findMeshByName(const std::string& name) const;
 
 		std::vector<MeshPtr> meshes; // unordered map for quicker search by name
-		void draw(const Transform3d& model = {}) override;
-		void draw(const ShaderPtr& shader, const Transform3d& model) override;
 
 		~Model() override;
 	};

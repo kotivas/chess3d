@@ -12,33 +12,95 @@
 #include "Core/Logger.hpp"
 
 namespace ResourceMgr {
-	static uint32_t defaultTexture = 0;
 	std::unordered_map<std::string, MSDFText::FontPtr> g_fonts;
 	std::unordered_map<std::string, Renderer::ModelPtr> g_models;
-	std::unordered_map<std::string, Renderer::ShaderPtr> g_shaders;
 	std::unordered_map<std::string, uint32_t> g_textures;
 	std::unordered_map<const aiMaterial*, Renderer::MaterialPtr> g_materials;
 
-
-	Renderer::ModelPtr GetModelByName(const std::string& name) {
-		return g_models.contains(name) ? g_models[name] : nullptr;
+	void LoadTexture(const std::string& name, const Renderer::TextureType type,
+	                 const Renderer::TextureWrapMode wrap_mode, const std::string& path) {
+		uint32_t textureLoc;
+		switch (type) {
+		case Renderer::TextureType::Tex2D:
+			textureLoc = CreateTexture2D(path, wrap_mode);
+			break;
+		case Renderer::TextureType::Tex3D:
+			textureLoc = CreateTexture3D(path, 128, 128, 128, wrap_mode);
+			break;
+		default:
+			textureLoc = 0;
+			Log::Warning("Unsupported texture type! {0}", name);
+			break;
+		};
+		g_textures.insert({name, textureLoc});
 	}
 
-	Renderer::ShaderPtr GetShaderByName(const std::string& name) {
-		return g_shaders.contains(name) ? g_shaders[name] : nullptr;
+	uint32_t CreateTexture3D(const std::string& path, uint16_t h, uint16_t w, uint16_t d,
+	                         const Renderer::TextureWrapMode wrap_mode) {
+		uint32_t textureLoc = 0;
+
+		std::vector<float> noiseData(h * w * d);
+		std::ifstream f(path, std::ios::binary);
+		f.read((char*)noiseData.data(), noiseData.size() * sizeof(float));
+		f.close();
+
+		glGenTextures(1, &textureLoc);
+		glBindTexture(GL_TEXTURE_3D, textureLoc);
+
+		glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
+		             w, h, d, 0,
+		             GL_RED, GL_FLOAT, noiseData.data());
+
+		const GLint wrap = static_cast<GLint>(wrap_mode);
+
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, wrap);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, wrap);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, wrap);
+
+		glBindTexture(GL_TEXTURE_3D, 0);
+
+		Log::Debug("3D Texture loaded: {0} ({1}x{2}x{3})", path, w, h, d);
+
+		return textureLoc;
 	}
 
-	MSDFText::FontPtr GetFontByName(const std::string& name) {
-		return g_fonts.contains(name) ? g_fonts[name] : nullptr;
-	}
+	uint32_t CreateTexture2D(const std::string& path, const Renderer::TextureWrapMode wrap_mode) {
+		uint32_t textureLoc;
+		int width, height, comp;
 
-	uint32_t GetTextureByName(const std::string& name) {
-		return g_textures.contains(name) ? g_textures[name] : defaultTexture;
-	}
+		// Load and create a texture
+		glGenTextures(1, &textureLoc);
+		glBindTexture(GL_TEXTURE_2D, textureLoc);
+		// All upcoming GL_TEXTURE_2D operations now have effect on this texture object
 
-	void LoadTexture(const std::string& name, const std::string& path) {
-		uint32_t texture = CreateTexture(path);
-		g_textures.insert({name, texture});
+		const GLint wrap = static_cast<GLint>(wrap_mode);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap); // repeat by default
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
+
+		// Set texture filtering parameters
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		// Load image, create texture and generate mipmaps
+		stbi_set_flip_vertically_on_load(false);
+		unsigned char* image = stbi_load(path.c_str(), &width, &height, &comp, 3);
+
+		if (!image) {
+			Log::Warning("Unable to load " + path + " - " + stbi_failure_reason());
+			return 0;
+		}
+
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		stbi_image_free(image);
+		glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
+
+		Log::Debug("Texture loaded: {0} ({1}x{2} {3})", path, width, height, comp);
+
+		return textureLoc;
 	}
 
 
@@ -153,74 +215,5 @@ namespace ResourceMgr {
 
 		// return font;
 		g_fonts.insert({name, font});
-	}
-
-	uint32_t CreateDefaultTexture(glm::ivec3 color1, glm::ivec3 color2) {
-		// Создание данных для текстуры 2x2 RGBA
-		unsigned char textureData[2 * 2 * 4] = {
-			// BLACK (0, 0, 0, 255)
-			(uint8_t)color1.r, (uint8_t)color1.g, (uint8_t)color1.b, 255,
-			// MAGENTA (255, 0, 255, 255)
-			(uint8_t)color2.r, (uint8_t)color2.g, (uint8_t)color2.b, 255,
-			// BLACK (0, 0, 0, 255)
-			(uint8_t)color1.r, (uint8_t)color1.g, (uint8_t)color1.b, 255,
-			// MAGENTA (255, 0, 255, 255)
-			(uint8_t)color2.r, (uint8_t)color2.g, (uint8_t)color2.b, 255
-		};
-
-		// Генерация текстуры в OpenGL
-		uint32_t textureID;
-		glGenTextures(1, &textureID);
-		glBindTexture(GL_TEXTURE_2D, textureID);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, textureData);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-		glBindTexture(GL_TEXTURE_2D, 0);
-
-		return textureID;
-	}
-
-	uint32_t CreateTexture(const std::string& path) {
-		uint32_t textureLoc;
-		int width, height;
-
-		// Load and create a texture
-		glGenTextures(1, &textureLoc);
-		glBindTexture(GL_TEXTURE_2D, textureLoc);
-		// All upcoming GL_TEXTURE_2D operations now have effect on this texture object
-
-		// Set the texture wrapping parameters
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		// Set texture wrapping to GL_REPEAT (usually basic wrapping method)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-		// Set texture filtering parameters
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		// Load image, create texture and generate mipmaps
-		stbi_set_flip_vertically_on_load(false);
-		unsigned char* image = stbi_load(path.c_str(), &width, &height, 0, 3);
-
-		if (!image) {
-			Log::Warning("Unable to load " + path + " - " + stbi_failure_reason());
-			return defaultTexture;
-		}
-
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		stbi_image_free(image);
-		glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
-
-		Log::Debug("Texture loaded: {}", path);
-
-		return textureLoc;
 	}
 }

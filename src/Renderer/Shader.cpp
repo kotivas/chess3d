@@ -1,17 +1,26 @@
 #include "Shader.hpp"
-#include "Common/Utils.hpp"
-#include <iostream>
+#include <glm/gtc/type_ptr.hpp>
+#include <glad/glad.h>
 
 namespace Renderer {
 	Shader::Shader()
-		: _id(0) {}
+		: _id(0) {
+	}
 
-	void Shader::use() {
+	Shader::Shader(const uint16_t id)
+		: _id(id) {
+	}
+
+	void Shader::use() const {
 		glUseProgram(_id);
 	}
 
-	GLuint Shader::getID() const {
+	uint16_t& Shader::getId() {
 		return _id;
+	}
+
+	Shader::~Shader() {
+		glDeleteProgram(_id);
 	}
 
 	// ------------------------------------------------------------------------
@@ -52,7 +61,7 @@ namespace Renderer {
 		glUniform3f(glGetUniformLocation(_id, name.c_str()), v.x, v.y, v.z);
 	}
 
-	void Shader::setUniform3f(const std::string& name, const Color::rgb_t& c) {
+	void Shader::setUniform3f(const std::string& name, Color::rgb_t c) const {
 		glUniform3f(glGetUniformLocation(_id, name.c_str()), c.r, c.g, c.b);
 	}
 
@@ -64,12 +73,11 @@ namespace Renderer {
 		glUniform4f(glGetUniformLocation(_id, name.c_str()), v.x, v.y, v.z, v.w);
 	}
 
-	void Shader::setUniform4f(const std::string& name, const Color::rgba_t& c) const {
+	void Shader::setUniform4f(const std::string& name, Color::rgba_t c) const {
 		glUniform4f(glGetUniformLocation(_id, name.c_str()), c.r, c.g, c.b, c.a);
 	}
 
-	// ------------------------------------------------------------------------
-	void Shader::setUniformMat4fv(const std::string& name, GLboolean transpose, glm::mat4& value) const {
+	void Shader::setUniformMat4fv(const std::string& name, bool transpose, glm::mat4 value) const {
 		glUniformMatrix4fv(glGetUniformLocation(_id, name.c_str()), 1, transpose, glm::value_ptr(value));
 	}
 }

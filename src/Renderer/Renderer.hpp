@@ -8,50 +8,43 @@
 
 #include "PostEffects/GaussianBlur.hpp"
 #include "../Game/Scene.hpp"
-#include "Shadow.hpp"
 #include "Sky.hpp"
+#include "AssetManager/AssetManager.hpp"
 #include "Common/Color.hpp"
-
+#include "RenderPasses/LightningPass.hpp"
+#include "RenderPasses/ShadowPass.hpp"
+#include "ResourceMgr/ResourceMgr.hpp"
 
 namespace Renderer {
 	void Init();
-	void InitGLFW();
+	void GlInit();
+	bool SetGlDebugCallback(GLDEBUGPROC fn);
 
-	// render shadow map from light position
-	void GenShadowMaps(Scene& scene);
-
-	void FrameBegin(Scene& scene);
+	void Render(Scene& scene, double dt);
 	void ApplyPostProcess(double dt);
-	void FrameEnd();
 
-	// void UpdateShadowRes();
 	void UpdateRenderRes();
+
+	void DrawText(const MSDFText::Text& text);
 	void DrawSky(SkyPtr sky, const Camera::Camera& cam, float time);
 	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h);
 	void DrawRectOnScreen(float x, float y, float w, float h, const Color::rgba_t& color);
+	void DrawDebug(int fps, float scale, float time, glm::vec3 cam_pos);
+
+	void GenerateRenderItem(const std::shared_ptr<Drawable>& drawable, std::vector<RenderItem>& items);
 
 	void RenderClear();
 
 	void CreateSceneFBO();
 	void CreateScreenFBO();
 	void CreateQuadVAO();
-	void CreateUBO();
-
-	void UpdateUBOMatrices(const glm::mat4& projection, const glm::mat4& view, const glm::mat4& dirLightSpaceMatrix,
-	                       const glm::mat4& spotLightSpaceMatrix);
-	void UpdateUBOLights(DirLight& dirLight, PointLight& pointLight, SpotLight& spotLight);
-	void UpdateUBOData(const glm::vec3& viewPos);
 
 	float GetSceneAvgLuminance();
 
 	void Shutdown();
 
 	static uint32_t sceneFBO, RBO;
-	static uint32_t UBOMatrices, UBOLights, UBOData;
 
-	static DirShadowData dirShadow;
-	static SpotShadowData spotShadow;
-	static OmniShadowData pointShadow;
 	static PostEffects::GaussianBlur blur;
 
 	static uint32_t quadVAO, quadVBO;
@@ -59,6 +52,15 @@ namespace Renderer {
 
 	static uint32_t screenFBO;
 	static uint32_t screenColorBuf;
+
+	static ShadowPass shadowPass;
+	static LightningPass lightPass;
+
+	static AssetManager::ShaderHandle quadShader;
+	static AssetManager::ShaderHandle solidShader;
+	static AssetManager::ShaderHandle textureShader;
+	static AssetManager::ShaderHandle postfxShader;
+	static AssetManager::ShaderHandle msdfTextShader;
 
 	inline GLFWwindow* g_window = nullptr;
 };
