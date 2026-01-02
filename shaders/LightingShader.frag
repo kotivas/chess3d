@@ -90,8 +90,6 @@ float PCF_Shadow(vec4 fragPosLightSpace, sampler2D shadowMap) {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-    // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
 
@@ -109,8 +107,9 @@ float PCF_Shadow(vec4 fragPosLightSpace, sampler2D shadowMap) {
     shadow /= float((range * 2 + 1) * (range * 2 + 1));
 
     // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
-    if (projCoords.z > 1.0)
-    shadow = 0.0;
+    if (projCoords.z > 1.0 ||
+    projCoords.x < 0.0 || projCoords.x > 1.0 ||
+    projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
 
     return shadow;
 }
@@ -118,7 +117,7 @@ float PCF_Shadow(vec3 fragPos, vec3 lightPos, samplerCube shadowCubemap) {
     vec3 fragToLight = fragPos - lightPos;
     float currentDepth = length(fragToLight);
     float shadow = 0.0;
-    float bias = 0.15;
+    float bias = 0.02;
     int samples = 10;
     float viewDistance = length(viewPos - fragPos);
     float diskRadius = (1.0 + (viewDistance / farPlane)) / 25.0;

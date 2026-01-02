@@ -1,5 +1,6 @@
 // it is what it is
 #include <chrono>
+#include <filesystem>
 
 #include "Common/Config.hpp"
 #include "Common/Utils.hpp"
@@ -18,6 +19,8 @@
 #include "./Input/Input.hpp"
 #include "AssetManager/AssetManager.hpp"
 
+static bool g_isPaused = false;
+
 void setupScene(Scene& scene) {
 	const auto base_shader = AssetManager::g_ShaderManager.getHandle("LightingShader");
 	if (!base_shader) {
@@ -31,20 +34,19 @@ void setupScene(Scene& scene) {
 
 	if (const Renderer::MeshPtr plane = Utils::CreatePlaneMesh("plane")) {
 		scene.objects.push_back(plane);
-		plane->transform = {.scale = {500, 1, 500}};
-		// plane->castShadow = false;
+		plane->transform = {.scale = {1000, 1, 1000}};
+		plane->castShadow = false;
+		plane->material->useDiffuse = false;
 		plane->material->solidColor = {0.25, 0.25, 0.25};
 		plane->material->shader = base_shader;
 		plane->material->shininess = 100;
 	}
 
 	const auto sky = std::make_shared<Renderer::Sky>();
-	sky->sunColor = Color::rgb_t(1.0, 0.9, 0.6);
-	sky->cirrusDensity = 1;
-	sky->cumulusDensity = 1;
 	sky->setup();
 
 	sky->shader = AssetManager::g_ShaderManager.getHandle("sky");
+	sky->atm_turbidity = 4.f;
 	scene.sky = sky;
 
 	const Renderer::MeshPtr cube = Utils::CreateCubeMesh("cube");
@@ -57,7 +59,8 @@ void setupScene(Scene& scene) {
 	cube->material->shader = base_shader;
 	scene.objects.push_back(cube);
 
-	// ResourceMgr::LoadModel("glock", "assets/models/glock/Glock-17gen5.fbx", base_shader);
+
+	ResourceMgr::LoadModel("glock", "assets/models/glock/Glock-17gen5.fbx", base_shader);
 	if (const Renderer::ModelPtr glock = ResourceMgr::GetModelByName("glock")) {
 		glock->transform = {
 			.position = {-35, 10, 0},
@@ -75,8 +78,8 @@ void setupScene(Scene& scene) {
 }
 
 void LoadResources() {
-	ResourceMgr::LoadTexture("noise3d", Renderer::TextureType::Tex3D, Renderer::TextureWrapMode::Repeat,
-	                         "assets/textures/noise3d.raw");
+	// ResourceMgr::LoadTexture("noise3d", Renderer::TextureType::Tex3D, Renderer::TextureWrapMode::Repeat,
+	//                          "assets/textures/noise3d.raw");
 	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata/inconsolata_light.png",
 	                          "assets/fonts/inconsolata/inconsolata_light.json");
 }
@@ -103,6 +106,7 @@ void LoadAllShaders() {
 	AssetManager::g_ShaderManager.load("depth", "Shaders/Depth.vert", "Shaders/Depth.frag");
 	AssetManager::g_ShaderManager.load("LightCube", "Shaders/LightCube.vert", "Shaders/LightCube.frag");
 	AssetManager::g_ShaderManager.load("solidcolor", "Shaders/2DColor.vert", "Shaders/2DColor.frag");
+	AssetManager::g_ShaderManager.load("2DTexture", "Shaders/2DTexture.vert", "Shaders/2DTexture.frag");
 	AssetManager::g_ShaderManager.load("LightingShader", "Shaders/LightingShader.vert", "Shaders/LightingShader.frag");
 	AssetManager::g_ShaderManager.load("msdf", "Shaders/MSDFText.vert", "Shaders/MSDFText.frag");
 	AssetManager::g_ShaderManager.load("point_shadow_depth", "Shaders/point_shadow_depth.vert",
@@ -113,8 +117,7 @@ void LoadAllShaders() {
 void RegisterCVars(Scene& scene) {
 	CMDUtils::Register("sensitivity", "Mouse responsivity (Float)", g_config.sensitivity, 0, 10);
 
-	CMDUtils::Register("sky_cirrusDens", "Density of cirrus clouds", scene.sky->cirrusDensity);
-	CMDUtils::Register("sky_cumulusDens", "Density of cumulus clouds", scene.sky->cumulusDensity);
+	CMDUtils::Register("time", "Day time in seconds", scene.time);
 
 	// --- Camera ---
 	CMDUtils::Register("cam_position", "Camera position (Vec3f)", scene.camera.position);
@@ -192,11 +195,13 @@ void RegisterCVars(Scene& scene) {
 	));
 }
 
-void updateControls() {
+void updateControls(Scene& scene) {
 	if (Input::IsKeyPressed(Key::Escape) && Console::IsVisible()) Console::Toggle();
 	if (Input::IsKeyPressed(Key::GraveAccent)) Console::Toggle();
 	if (Input::IsKeyPressed(Key::F11)) GlUtils::SaveFrame("screenshot");
-	if (Input::IsKeyDown(Key::LeftAlt) && Input::IsKeyPressed(Key::R)) ReloadShaders();
+	if (Input::IsKeyPressed(Key::L) && !Console::g_isVisible) scene.spot_light.enable = !scene.spot_light.enable;
+	if (Input::IsKeyPressed(Key::R)) ReloadShaders();
+	if (Input::IsKeyPressed(Key::Pause)) g_isPaused = !g_isPaused;
 
 	if (Input::g_resizedHeight || Input::g_resizedWidth) {
 		if (Input::g_resizedWidth == 0 && Input::g_resizedHeight == 0) return; // in case of minimizing
@@ -227,7 +232,7 @@ int main(int argc, char** argv) {
 		.r_blurPasses = 3,
 		.r_gamma = 1,
 		.r_resolution = {1920, 1080},
-		.r_shadowRes = 2048,
+		.r_shadowRes = 1024,
 		.r_renderDistance = 1000.f,
 		.r_vsync = false,
 
@@ -240,7 +245,7 @@ int main(int argc, char** argv) {
 		.dir_light = {
 			.enable = 1,
 			.direction = glm::normalize(glm::vec3(-1.0f, -1.0f, -1.0f)),
-			.ambient = glm::vec3(0.2f), // subtle ambient
+			.ambient = glm::vec3(0.1f), // subtle ambient
 			.diffuse = glm::vec3(0.95f), // strong diffuse
 			.specular = glm::vec3(0.2f) // modest specular
 		},
@@ -262,7 +267,7 @@ int main(int argc, char** argv) {
 			.outerCutOff = glm::cos(glm::radians(17.5f)), // outer (soft edge)
 			.constant = 1.0f,
 			.linear = 0.09f,
-			.quadratic = 0.032f,
+			.quadratic = 0.008f,
 			.ambient = glm::vec3(0.0f),
 			.diffuse = glm::vec3(1.0f),
 			.specular = glm::vec3(1.0f)
@@ -285,25 +290,37 @@ int main(int argc, char** argv) {
 	setupScene(scene);
 	RegisterCVars(scene);
 
-	scene.time = 6000;
+	scene.time = 30000;
 	double last_time = glfwGetTime();
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		const double dt = glfwGetTime() - last_time;
 		last_time = glfwGetTime();
-		scene.time += dt * 100;
-		scene.time = fmod(scene.time, 86400);
 
 		// UPDATE
-		camera_controller.update(scene.camera, dt);
-		camera_controller.handleControls(scene.camera);
-		updateControls();
-		Console::Update(dt);
-		scene.sky->update(scene.time);
-		scene.dir_light.direction = -scene.sky->sunDir;
+		if (!g_isPaused) {
+			scene.time += dt * 100;
+			scene.time = fmod(scene.time, 86400);
+
+			camera_controller.update(scene.camera, dt);
+			camera_controller.handleControls(scene.camera);
+			Console::Update(dt);
+			float dayFraction = glm::fract(scene.time / 86400); // 0..1
+			scene.sky->calculateSun({dayFraction * glm::two_pi<float>(), 0.f});
+
+			scene.dir_light.diffuse = scene.sky->sun_color;
+			scene.dir_light.specular = scene.sky->sun_color;
+			scene.dir_light.direction = -scene.sky->sun_direction;
+
+			if (scene.spot_light.enable) {
+				scene.spot_light.direction = scene.camera.forward;
+				scene.spot_light.position = scene.camera.position;
+			}
+		}
 
 		// RENDER
 		Renderer::Render(scene, dt);
 		Input::PollEvents(); // always should be updated last
+		updateControls(scene);
 	}
 	Renderer::Shutdown();
 	glfwTerminate();

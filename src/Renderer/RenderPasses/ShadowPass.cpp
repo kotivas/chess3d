@@ -12,21 +12,19 @@ namespace Renderer {
 
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_FRONT);
-		// glFrontFace(GL_CCW);
 
 		if (ctx.scene.dir_light.enable) drawDirectionalShadow(ctx);
 		if (ctx.scene.spot_light.enable) drawSpotShadow(ctx);
 		if (ctx.scene.point_light.enable) drawPointShadow(ctx, 0);
 	}
 
-	glm::mat4 ShadowPass::calcDirLightSpace(const glm::vec3& light_dir, const float near, const float far) {
-		// const glm::mat4 light_projection = glm::ortho(-far, far, -far, far, near, far);
-		const glm::mat4 light_projection = glm::ortho(-100.f, 100.f, -100.f, 100.f, near, far);
-		const glm::vec3 light_pos = -light_dir * glm::vec3(far);
+	glm::mat4 ShadowPass::calcDirLightSpace(const glm::vec3& light_dir, const Camera::Camera& cam) { // FIXME make it camera depend
+		const glm::mat4 lightProjection = glm::ortho(-100.f, 100.f, -100.f, 100.f, cam.nearPlane, cam.farPlane);
+		const glm::vec3 lightPos = -light_dir * glm::vec3(100);
 		// HACK shadow casts incorrectly, if light falls vertically downward
-		const glm::vec3 light_up = glm::abs(light_dir.y) < 0.999 ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
+		const glm::vec3 lightUp = glm::abs(light_dir.y) < 0.999 ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
 
-		return light_projection * glm::lookAt(light_pos, light_pos + light_dir, light_up);
+		return lightProjection * glm::lookAt(lightPos, lightPos + light_dir, lightUp);
 	}
 
 	glm::mat4 ShadowPass::calcSpotLightSpace(const glm::vec3& light_pos, const glm::vec3& light_dir, const float fov,
@@ -70,7 +68,7 @@ namespace Renderer {
 	}
 
 	void ShadowPass::drawDirectionalShadow(RenderContext& ctx) {
-		ctx.dir_shadow.light_space = calcDirLightSpace(ctx.scene.dir_light.direction, ctx.near, ctx.far);
+		ctx.dir_shadow.light_space = calcDirLightSpace(ctx.scene.dir_light.direction, ctx.scene.camera);
 
 		// render scene from light's point of view
 		glViewport(0, 0, _directional_shadow.resolution, _directional_shadow.resolution);
@@ -138,7 +136,7 @@ namespace Renderer {
 
 		for (int i = 0; i < 6; i++) {
 			shader->setUniformMat4fv("shadowMatrices[" + std::to_string(i) + "]", false,
-			                         _point_shadows[index].transforms[i]);
+			                         ctx.point_shadows[index].transforms[i]);
 		}
 		//
 		shader->setUniform3f("lightPos", ctx.scene.point_light.position);

@@ -40,6 +40,7 @@ set(SOURCE
         src/Renderer/RenderPasses/ShadowPass.cpp
         src/Renderer/RenderPasses/LightningPass.cpp
         src/Renderer/RenderPasses/UiPass.cpp
+        src/Renderer/Sky.cpp
 )
 
 add_executable(chess3d ${SOURCE})

@@ -77,6 +77,16 @@ namespace Renderer {
 		glfwSwapInterval(g_config.r_vsync); // vsync 1 - on; 0 - off
 
 		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+		// log gl info
+		const std::string vendor{(char*)glGetString(GL_VENDOR)};
+		const std::string device{(char*)glGetString(GL_RENDERER)};
+		const std::string version{(char*)glGetString(GL_VERSION)};
+		const std::string glsl_version{(char*)glGetString(GL_SHADING_LANGUAGE_VERSION)};
+		Log::Debug("GL vendor: {0}", vendor);
+		Log::Debug("GL device: {0}", device);
+		Log::Debug("GL version: {0}", version);
+		Log::Debug("GLSL version: {0}", glsl_version);
 	}
 
 	void CreateScreenFBO() {
@@ -182,24 +192,16 @@ namespace Renderer {
 		shader->use();
 
 		shader->setUniform1f("uTime", time);
-		shader->setUniform3f("uSunDirection", sky->sunDir);
-		shader->setUniform3f("uSunColor", sky->sunColor);
-		shader->setUniform1f("uCirrus", sky->cirrusDensity);
-		shader->setUniform1f("uCumulus", sky->cumulusDensity);
-		shader->setUniform2f("uWindDirection", glm::vec2(1.0, 1.0));
-
-		glm::mat4 viewNoTrans = glm::mat4(glm::mat3(cam.viewMatrix));
+		shader->setUniform3f("uSunDirection", sky->sun_direction);
+		for (int i = 0; i < 10; i++) shader->setUniform3f("uAtmParams[" + std::to_string(i) + "]", sky->atm_params[i]);
+		const glm::mat4 viewNoTrans = glm::mat4(glm::mat3(cam.viewMatrix));
 		shader->setUniformMat4fv("uView", false, viewNoTrans);
 		shader->setUniformMat4fv("uProjection", false, cam.projectionMatrix);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_3D, ResourceMgr::GetTextureByName("noise3d"));
-		shader->setUniform1i("tNoise", 0);
 
 		glDepthMask(GL_FALSE);
 		glDisable(GL_CULL_FACE);
 
-		glBindVertexArray(sky->VAO);
+		glBindVertexArray(sky->vao);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		glBindVertexArray(0);
 
@@ -295,6 +297,21 @@ namespace Renderer {
 		glBindVertexArray(quadVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glBindVertexArray(0);
+
+		// debug
+		glViewport(0, 0, 512, 512);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		AssetManager::g_ShaderManager.get("2DTexture")->use();
+		AssetManager::g_ShaderManager.get("2DTexture")->setUniform1i("texture0", 0);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, ctx.dir_shadow.shadow_map);
+
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glBindVertexArray(0);
+		// end
 
 		glEnable(GL_DEPTH_TEST);
 		glfwSwapBuffers(g_window);

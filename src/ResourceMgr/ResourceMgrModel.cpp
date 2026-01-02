@@ -106,7 +106,6 @@ namespace ResourceMgr {
 		nmat->shininess = shininess;
 		// if (nmat->shininess == 0) nmat->shininess = 32.f;
 
-
 		aiString diffuseTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexPath) == AI_SUCCESS) {
 			nmat->diffuse = CreateTexture2D(directory + getFileName(diffuseTexPath.C_Str()),
@@ -142,7 +141,7 @@ namespace ResourceMgr {
 		return nmat;
 	}
 
-	void ProcessNode(aiNode* node, const aiScene* scene, const glm::mat4& transform, const Renderer::ModelPtr& model) {
+	void ProcessNode(aiNode* node, const aiScene* scene, const glm::mat4& transform, const Renderer::ModelPtr& model, const std::string& model_dir) {
 		glm::mat4 global_transform = transform * AssimpMatrixToGLM(node->mTransformation);
 
 		if (node->mNumMeshes > 0) {
@@ -160,7 +159,8 @@ namespace ResourceMgr {
 				aiMaterial* mat = scene->mMaterials[aiMesh->mMaterialIndex];
 				if (!g_materials.contains(mat)) {
 					Renderer::MaterialPtr nmat;
-					nmat = ProcessMaterial(mat, "./");
+
+					nmat = ProcessMaterial(mat, model_dir);
 					g_materials.emplace(mat, nmat);
 				}
 
@@ -172,7 +172,7 @@ namespace ResourceMgr {
 			}
 		}
 
-		for (int i = 0; i < node->mNumChildren; i++) ProcessNode(node->mChildren[i], scene, global_transform, model);
+		for (int i = 0; i < node->mNumChildren; i++) ProcessNode(node->mChildren[i], scene, global_transform, model, model_dir);
 	}
 
 	bool LoadModel(const std::string& name, const std::string& path, AssetManager::ShaderHandle shader) {
@@ -191,8 +191,10 @@ namespace ResourceMgr {
 		}
 
 		Renderer::ModelPtr model = std::make_unique<Renderer::Model>(name);
+		const std::string directory = std::filesystem::path(path).parent_path().string() + "/";
 
-		ProcessNode(scene->mRootNode, scene, glm::mat4(1.f), model);
+
+		ProcessNode(scene->mRootNode, scene, glm::mat4(1.f), model, directory);
 
 		for (const auto& mat : g_materials | std::views::values) {
 			mat->shader = shader;

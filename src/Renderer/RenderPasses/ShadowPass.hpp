@@ -40,7 +40,7 @@ namespace Renderer {
 	private:
 		static void drawRenderItem(const RenderItem& item, const Shader* shader);
 
-		static glm::mat4 calcDirLightSpace(const glm::vec3& light_dir, float near, float far);
+		static glm::mat4 calcDirLightSpace(const glm::vec3& light_dir, const Camera::Camera& cam);
 		static glm::mat4 calcSpotLightSpace(const glm::vec3& light_pos, const glm::vec3& light_dir, float fov, float near,
 		                             float far);
 		static std::array<glm::mat4, 6> calcPointLightSpace(const glm::vec3& light_pos, float near, float far, float resolution);
