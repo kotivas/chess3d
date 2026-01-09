@@ -13,22 +13,40 @@ namespace Renderer {
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_FRONT);
 
-		if (ctx.scene.dir_light.enable) drawDirectionalShadow(ctx);
-		if (ctx.scene.spot_light.enable) drawSpotShadow(ctx);
-		if (ctx.scene.point_light.enable) drawPointShadow(ctx, 0);
+		if (ctx.light_info.directional.enable) drawDirectionalShadow(ctx);
+		if (ctx.light_info.spot.enable) drawSpotShadow(ctx);
+		if (ctx.light_info.point.enable) drawPointShadow(ctx, 0);
 	}
 
-	glm::mat4 ShadowPass::calcDirLightSpace(const glm::vec3& light_dir, const Camera::Camera& cam) { // FIXME make it camera depend
-		const glm::mat4 lightProjection = glm::ortho(-100.f, 100.f, -100.f, 100.f, cam.nearPlane, cam.farPlane);
-		const glm::vec3 lightPos = -light_dir * glm::vec3(100);
-		// HACK shadow casts incorrectly, if light falls vertically downward
-		const glm::vec3 lightUp = glm::abs(light_dir.y) < 0.999 ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
+	glm::mat4 ShadowPass::calcDirLightSpace(const glm::vec3& light_dir, const Camera::CameraInfo& cam, float shadow_distance) const {
+		float lightDistance = 200.f;
 
-		return lightProjection * glm::lookAt(lightPos, lightPos + light_dir, lightUp);
+		glm::vec3 L = glm::normalize(light_dir);
+
+		float centerOffset = shadow_distance * 0.5f;
+		glm::vec3 shadowCenter = cam.position + cam.forward * centerOffset;
+
+		// --- snap to texel ---
+		float half = shadow_distance * 0.5f;
+		float texelSize = (2.0f * half) / _directional_shadow.resolution;
+
+		shadowCenter.x = std::floor(shadowCenter.x / texelSize) * texelSize;
+		shadowCenter.y = std::floor(shadowCenter.y / texelSize) * texelSize;
+		shadowCenter.z = std::floor(shadowCenter.z / texelSize) * texelSize;
+
+		glm::vec3 up = glm::vec3(0, 1, 0);
+		if (glm::abs(glm::dot(L, up)) > 0.999f)
+			up = glm::vec3(1, 0, 0);
+
+		glm::vec3 lightPos = shadowCenter - L * lightDistance;
+		glm::mat4 lightView = glm::lookAt(lightPos, shadowCenter, up);
+		glm::mat4 lightProj = glm::ortho(-half, half, -half, half, cam.nearPlane, cam.farPlane);
+
+		return lightProj * lightView;
 	}
 
 	glm::mat4 ShadowPass::calcSpotLightSpace(const glm::vec3& light_pos, const glm::vec3& light_dir, const float fov,
-	                                         const float near, const float far) {
+	                                         const float near, const float far) const {
 		glm::mat4 lightProjection = glm::perspective(fov, 1.f, near, far);
 		glm::mat4 lightView = glm::lookAt(light_pos, light_pos + light_dir, {0.f, 1.f, 0.f});
 
@@ -36,7 +54,7 @@ namespace Renderer {
 	}
 
 	std::array<glm::mat4, 6> ShadowPass::calcPointLightSpace(const glm::vec3& light_pos, const float near,
-	                                                         const float far, const float resolution) {
+	                                                         const float far, const float resolution) const  {
 		const glm::mat4 shadow_proj = glm::perspective(glm::radians(90.0f), (float)resolution / (float)resolution,
 		                                               near, far);
 
@@ -58,7 +76,7 @@ namespace Renderer {
 		return transforms;
 	}
 
-	void ShadowPass::drawRenderItem(const RenderItem& item, const Shader* shader) {
+	void ShadowPass::drawRenderItem(const RenderItem& item, const Shader* shader) const {
 		if (!shader) return;
 
 		shader->setUniformMat4fv("uModel", GL_FALSE, item.world_transform);
@@ -68,7 +86,7 @@ namespace Renderer {
 	}
 
 	void ShadowPass::drawDirectionalShadow(RenderContext& ctx) {
-		ctx.dir_shadow.light_space = calcDirLightSpace(ctx.scene.dir_light.direction, ctx.scene.camera);
+		ctx.dir_shadow.light_space = calcDirLightSpace(ctx.light_info.directional.direction, ctx.camera, ctx.settings.shadowDistance);
 
 		// render scene from light's point of view
 		glViewport(0, 0, _directional_shadow.resolution, _directional_shadow.resolution);
@@ -93,8 +111,8 @@ namespace Renderer {
 	}
 
 	void ShadowPass::drawSpotShadow(RenderContext& ctx) {
-		ctx.spot_shadow.light_space = calcSpotLightSpace(ctx.scene.spot_light.position, ctx.scene.spot_light.direction,
-		                                                 ctx.scene.camera.fov, ctx.near, ctx.far);
+		ctx.spot_shadow.light_space = calcSpotLightSpace(ctx.light_info.spot.position, ctx.light_info.spot.direction,
+		                                                 ctx.camera.fov, ctx.camera.nearPlane, ctx.camera.farPlane);
 
 		// render scene from light's point of view
 		glViewport(0, 0, _spot_shadow.resolution, _spot_shadow.resolution);
@@ -118,7 +136,8 @@ namespace Renderer {
 	void ShadowPass::drawPointShadow(RenderContext& ctx, uint8_t index) {
 		ctx.point_shadows.emplace_back();
 
-		ctx.point_shadows[index].transforms = calcPointLightSpace(ctx.scene.point_light.position, ctx.near, ctx.far,
+		ctx.point_shadows[index].transforms = calcPointLightSpace(ctx.light_info.point.position, ctx.camera.nearPlane,
+		                                                          ctx.camera.farPlane,
 		                                                          _point_shadows[index].resolution);
 
 		glViewport(0, 0, _point_shadows[index].resolution, _point_shadows[index].resolution);
@@ -139,8 +158,8 @@ namespace Renderer {
 			                         ctx.point_shadows[index].transforms[i]);
 		}
 		//
-		shader->setUniform3f("lightPos", ctx.scene.point_light.position);
-		shader->setUniform1f("far_plane", ctx.far);
+		shader->setUniform3f("lightPos", ctx.light_info.point.position);
+		shader->setUniform1f("far_plane", ctx.camera.farPlane);
 
 		for (const auto& item : ctx.render_items) {
 			if (item.mesh->castShadow) drawRenderItem(item, shader);
@@ -148,19 +167,19 @@ namespace Renderer {
 		ctx.point_shadows[index].shadow_map = _point_shadows[index].cubemap;
 	}
 
-	void ShadowPass::init() {
-		_directional_shadow.resolution = g_config.r_shadowRes;
+	void ShadowPass::init(RenderSettings& settings) {
+		_directional_shadow.resolution = settings.dirShadowRes;
 		_directional_shadow.shader = AssetManager::g_ShaderManager.getHandle("depth");
 		generateMap(_directional_shadow.map, _directional_shadow.fbo, _directional_shadow.resolution);
 
-		_spot_shadow.resolution = g_config.r_shadowRes;
+		_spot_shadow.resolution = settings.spotShadowRes;
 		_spot_shadow.shader = AssetManager::g_ShaderManager.getHandle("depth");
 		generateMap(_spot_shadow.map, _spot_shadow.fbo, _spot_shadow.resolution);
 	}
 
-	void ShadowPass::addPointShadow() {
+	void ShadowPass::addPointShadow(float resolution) {
 		OmniShadowData shadow;
-		shadow.resolution = g_config.r_shadowRes;
+		shadow.resolution = resolution;
 		shadow.shader = AssetManager::g_ShaderManager.getHandle("point_shadow_depth");
 		generateCubeMap(shadow.cubemap, shadow.fbo, shadow.resolution);
 		_point_shadows.push_back(shadow);

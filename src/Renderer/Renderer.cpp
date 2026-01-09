@@ -38,9 +38,9 @@ namespace Renderer {
 		CreateScreenFBO();
 		CreateQuadVAO();
 
-		blur.init(g_config.r_resolution.x, g_config.r_resolution.y, quadVAO, quadVBO);
-		shadowPass.init();
-		shadowPass.addPointShadow();
+		blur.init(settings.renderResolution.x, settings.renderResolution.y, quadVAO, quadVBO);
+		shadowPass.init(settings);
+		shadowPass.addPointShadow(settings.pointShadowRes);
 		lightPass.init();
 
 		glGenVertexArrays(1, &msdfvao);
@@ -70,11 +70,11 @@ namespace Renderer {
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 		//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-		g_window = glfwCreateWindow(g_config.sys_windowResolution.x, g_config.sys_windowResolution.y, "chess3d",
+		g_window = glfwCreateWindow(g_config.windowResolution.x, g_config.windowResolution.y, "chess3d",
 		                            nullptr, nullptr);
 
 		glfwMakeContextCurrent(g_window);
-		glfwSwapInterval(g_config.r_vsync); // vsync 1 - on; 0 - off
+		glfwSwapInterval(settings.vsync); // vsync 1 - on; 0 - off
 
 		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
@@ -96,7 +96,7 @@ namespace Renderer {
 		glGenTextures(1, &screenColorBuf);
 
 		glBindTexture(GL_TEXTURE_2D, screenColorBuf);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, settings.renderResolution.x, settings.renderResolution.y, 0, GL_RGBA,
 		             GL_FLOAT, NULL);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -114,7 +114,8 @@ namespace Renderer {
 		glGenTextures(2, sceneColorBufs);
 		for (int i = 0; i < 2; i++) {
 			glBindTexture(GL_TEXTURE_2D, sceneColorBufs[i]);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, settings.renderResolution.x, settings.renderResolution.y, 0,
+			             GL_RGBA,
 			             GL_FLOAT, NULL);
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -127,8 +128,8 @@ namespace Renderer {
 		// create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
 		glGenRenderbuffers(1, &RBO);
 		glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.r_resolution.x,
-		                      g_config.r_resolution.y);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, settings.renderResolution.x,
+		                      settings.renderResolution.y);
 		// use a single renderbuffer object for both a depth AND stencil buffer.
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
 
@@ -186,7 +187,7 @@ namespace Renderer {
 		return 0.2126f * pixel[0] + 0.7152f * pixel[1] + 0.0722f * pixel[2];
 	}
 
-	void DrawSky(SkyPtr sky, const Camera::Camera& cam, float time) {
+	void DrawSky(SkyPtr sky, const Camera::CameraInfo& cam, float time) {
 		Shader* shader = AssetManager::g_ShaderManager.get(sky->shader);
 
 		shader->use();
@@ -216,14 +217,14 @@ namespace Renderer {
 		const std::vector debug_lines = {
 			"FPS: " + std::to_string(fps),
 			std::format("Cam pos: {0:.2f} {1:.2f} {2:.2f}", cam_pos.x, cam_pos.y, cam_pos.z),
-			std::format("Exp: {:.3f}", g_config.fx_exposure),
+			std::format("Exp: {:.3f}", settings.FX.exposure),
 			std::format("Time: {:.1f}", time)
 		};
 
 		for (int i = 0; i < debug_lines.size(); i++) {
 			const float lineHeight = font->lineHeight * scale;
-			float x = g_config.r_resolution.x - font->getStringWidth(debug_lines[i], scale);
-			float y = g_config.r_resolution.y - lineHeight - i * lineHeight;
+			float x = settings.renderResolution.x - font->getStringWidth(debug_lines[i], scale);
+			float y = settings.renderResolution.y - lineHeight - i * lineHeight;
 
 			DrawText({
 				debug_lines[i],
@@ -249,23 +250,27 @@ namespace Renderer {
 	void Render(Scene& scene, double dt) {
 		RenderClear();
 
-		RenderContext ctx{
-			// OPTIMIZE do not use whole scene var
-			.near = scene.camera.nearPlane,
-			.far = scene.camera.farPlane,
-			.render_width = g_config.r_resolution.x,
-			.render_height = g_config.r_resolution.y,
-			.scene = scene,
-			.target_fbo = sceneFBO,
+		const LightRenderInfo light{
+			.directional = scene.dir_light,
+			.point = scene.point_light,
+			.spot = scene.spot_light
 		};
+
+		RenderContext ctx{
+			.settings = settings,
+			.target_framebuffer = sceneFBO,
+			.light_info = light,
+			.camera = scene.camera,
+		};
+
 		for (const auto& drawable : scene.objects) {
 			if (drawable->drawable) GenerateRenderItem(drawable, ctx.render_items);
 		}
 
 		shadowPass.pass(ctx);
 
-		ctx.target_fbo = sceneFBO;
-		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
+		ctx.target_framebuffer = sceneFBO;
+		glViewport(0, 0, settings.renderResolution.x, settings.renderResolution.y);
 		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
 		DrawSky(scene.sky, scene.camera, scene.time); // todo SkyPass
 
@@ -286,7 +291,7 @@ namespace Renderer {
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glDisable(GL_DEPTH_TEST);
-		glViewport(0, 0, g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
+		glViewport(0, 0, g_config.windowResolution.x, g_config.windowResolution.y);
 
 		AssetManager::g_ShaderManager.get(quadShader)->use();
 		AssetManager::g_ShaderManager.get(quadShader)->setUniform1i("texture0", 0);
@@ -321,11 +326,11 @@ namespace Renderer {
 		uint32_t bloom = sceneColorBufs[1];
 
 		// calc exposure
-		if (g_config.fx_autoExposure) {
-			g_config.fx_exposure = PostEffects::GetLerpExposure(g_config.fx_exposure, GetSceneAvgLuminance(),
-			                                                    g_config.fx_autoExposureSpeed);
+		if (g_config.autoExposure) {
+			settings.FX.exposure = PostEffects::GetLerpExposure(settings.FX.exposure, GetSceneAvgLuminance(),
+			                                                    g_config.autoExposureSpeed);
 		}
-		if (g_config.fx_bloom) bloom = blur.blur(sceneColorBufs[1], g_config.r_blurPasses);
+		if (settings.FX.bloom) bloom = blur.blur(sceneColorBufs[1], settings.blurPasses);
 
 		glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
 		glBindFramebuffer(GL_FRAMEBUFFER, screenFBO);
@@ -334,24 +339,24 @@ namespace Renderer {
 
 		shader->use();
 
-		shader->setUniform2f("resolution", g_config.sys_windowResolution);
+		shader->setUniform2f("resolution", g_config.windowResolution);
 		shader->setUniform1f("time", glfwGetTime());
 
-		shader->setUniform1i("effects.bloom", g_config.fx_bloom);
-		shader->setUniform1f("effects.gamma", g_config.r_gamma);
-		shader->setUniform1f("effects.chromaticOffset", g_config.fx_chromaticOffset);
-		shader->setUniform1i("effects.quantization", g_config.fx_quantization);
-		shader->setUniform1i("effects.quantizationLevel", g_config.fx_quantizationLevel);
-		shader->setUniform1i("effects.vignette", g_config.fx_vignette);
-		shader->setUniform1f("effects.vignetteIntensity", g_config.fx_vignetteIntensity);
-		shader->setUniform3f("effects.vignetteColor", g_config.fx_vignetteColor);
-		shader->setUniform1f("effects.exposure", g_config.fx_exposure);
-		shader->setUniform1f("effects.saturation", g_config.fx_saturation);
+		shader->setUniform1i("effects.bloom", settings.FX.bloom);
+		shader->setUniform1f("effects.gamma", settings.FX.gamma);
+		shader->setUniform1f("effects.chromaticOffset", settings.FX.chromaticOffset);
+		shader->setUniform1i("effects.quantization", settings.FX.quantization);
+		shader->setUniform1i("effects.quantizationLevel", settings.FX.quantizationLevel);
+		shader->setUniform1i("effects.vignette", settings.FX.vignette);
+		shader->setUniform1f("effects.vignetteIntensity", settings.FX.vignetteIntensity);
+		shader->setUniform3f("effects.vignetteColor", settings.FX.vignetteColor);
+		shader->setUniform1f("effects.exposure", settings.FX.exposure);
+		shader->setUniform1f("effects.saturation", settings.FX.saturation);
 
 		shader->setUniform1i("screenTexture", 0);
 		shader->setUniform1i("bloomBlur", 1);
 
-		glViewport(0, 0, g_config.r_resolution.x, g_config.r_resolution.y);
+		glViewport(0, 0, settings.renderResolution.x, settings.renderResolution.y);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, sceneColorBufs[0]);
 		glActiveTexture(GL_TEXTURE1);
@@ -416,8 +421,7 @@ namespace Renderer {
 
 		shader->use();
 
-		glm::mat4 proj = glm::ortho(0.0f, static_cast<float>(g_config.r_resolution.x), 0.0f,
-		                            static_cast<float>(g_config.r_resolution.y));
+		glm::mat4 proj = glm::ortho(0.0f, settings.renderResolution.x, 0.0f, settings.renderResolution.y);
 
 		shader->setUniformMat4fv("uProjection", false, proj);
 		shader->setUniform4f("uColor", text.color.r, text.color.g, text.color.b, text.color.a);
@@ -440,7 +444,7 @@ namespace Renderer {
 		glEnable(GL_DEPTH_TEST);
 	}
 
-	void DrawRectOnScreen(float x, float y, float w, float h, const Color::rgba_t& color) {
+	void DrawRectOnScreen(float x, float y, float w, float h, const glm::vec4& color) {
 		Shader* shader = AssetManager::g_ShaderManager.get(solidShader);
 
 		shader->use();
@@ -452,7 +456,7 @@ namespace Renderer {
 
 		shader->setUniformMat4fv("uModel", false, model);
 
-		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.r_resolution.x, (float)g_config.r_resolution.y, 0.0f);
+		glm::mat4 projection = glm::ortho(0.0f, settings.renderResolution.x, settings.renderResolution.y, 0.0f);
 
 		shader->setUniformMat4fv("uProjection", false, projection);
 
@@ -480,7 +484,7 @@ namespace Renderer {
 
 		shader->setUniformMat4fv("uModel", false, model);
 
-		glm::mat4 projection = glm::ortho(0.0f, (float)g_config.r_resolution.x, (float)g_config.r_resolution.y, 0.0f);
+		glm::mat4 projection = glm::ortho(0.0f, settings.renderResolution.x, settings.renderResolution.y, 0.0f);
 
 		shader->setUniformMat4fv("uProjection", false, projection);
 
@@ -511,12 +515,12 @@ namespace Renderer {
 	void UpdateRenderRes() {
 		for (int i = 0; i < 2; i++) {
 			glBindTexture(GL_TEXTURE_2D, sceneColorBufs[i]);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, g_config.r_resolution.x, g_config.r_resolution.y, 0, GL_RGBA,
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, settings.renderResolution.x, settings.renderResolution.y, 0, GL_RGBA,
 			             GL_FLOAT,
 			             NULL);
 		}
 
 		glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_config.r_resolution.x, g_config.r_resolution.y);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, settings.renderResolution.x, settings.renderResolution.y);
 	}
 }

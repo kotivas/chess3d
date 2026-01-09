@@ -12,10 +12,12 @@ namespace Renderer {
 		bool useSpecular{false};
 		uint32_t normal{0};
 		bool useNormal{false};
+		uint32_t displacement{0};
+		bool useDisplacement{false};
 
 		float shininess{0};
 		AssetManager::ShaderHandle shader;
-		glm::vec3 solidColor{0, 0, 0};
+		glm::vec3 solidColor{1, 0, 0};
 		//GLuint dissolve;  // 1 == opaque; 0 == fully transparent
 	};
 

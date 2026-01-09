@@ -1,6 +1,7 @@
 #pragma once
 #include <glad/glad.h>
 
+#include "RenderSettings.hpp"
 #include "Game/Scene.hpp"
 
 namespace Renderer {
@@ -20,15 +21,20 @@ namespace Renderer {
 		glm::mat4 world_transform;
 	};
 
+	struct LightRenderInfo {
+		DirLight directional;
+		PointLight point;
+		SpotLight spot;
+	};
+
 	struct RenderContext {
-		float near;
-		float far;
-		uint16_t render_width;
-		uint16_t render_height;
+		const RenderSettings& settings;
 
 		std::vector<RenderItem> render_items;
-		Scene& scene;
-		uint32_t target_fbo;
+		uint32_t target_framebuffer;
+
+		LightRenderInfo light_info;
+		Camera::CameraInfo camera;
 
 		ShadowInfo dir_shadow;
 		ShadowInfo spot_shadow;

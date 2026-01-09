@@ -4,8 +4,8 @@
 #include <glm/ext/matrix_transform.hpp>
 
 namespace Camera {
-	struct Camera {
-		Camera(float fov = 45.f, glm::vec3 position = {0, 0, 0},
+	struct CameraInfo {
+		CameraInfo(float fov = 45.f, glm::vec3 position = {0, 0, 0},
 		       float znear = 0.1, float zfar = 100)
 			: position(position), yaw(0), pitch(0), fov(fov), nearPlane(znear), farPlane(zfar), forward(0, 0, 1),
 			  up(0, 1, 0) {}

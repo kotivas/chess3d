@@ -131,11 +131,18 @@ namespace ResourceMgr {
 			nmat->useNormal = true;
 		}
 
+		aiString disPlaceTexPath;
+		if (aiMaterial->GetTexture(aiTextureType_DISPLACEMENT, 0, &disPlaceTexPath) == AI_SUCCESS) {
+			nmat->displacement = CreateTexture2D(directory + getFileName(disPlaceTexPath.C_Str()),
+										   Renderer::TextureWrapMode::ClampToEdge);
+			nmat->useDisplacement = true;
+		}
+
 		aiString heightTexPath;
 		if (aiMaterial->GetTexture(aiTextureType_HEIGHT, 0, &heightTexPath) == AI_SUCCESS) {
-			nmat->normal = CreateTexture2D(directory + getFileName(heightTexPath.C_Str()),
+			nmat->displacement = CreateTexture2D(directory + getFileName(heightTexPath.C_Str()),
 			                               Renderer::TextureWrapMode::ClampToEdge);
-			nmat->useNormal = true;
+			nmat->useDisplacement = true;
 		}
 
 		return nmat;

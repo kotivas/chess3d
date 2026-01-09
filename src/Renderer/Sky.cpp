@@ -9,7 +9,7 @@
 #include "Common/HosekDataset.hpp"
 
 namespace Renderer {
-	inline constexpr std::array ALBEDO = {0.1f, 0.1f, 0.1f};
+	inline constexpr std::array ALBEDO = {0.3f, 0.3f, 0.3f};
 
 	void Sky::setup() {
 		const float quadVertices[] = {
@@ -135,7 +135,7 @@ namespace Renderer {
 		else if (sun_amount < -1.0f) sun_amount = -2.0f - sun_amount;
 
 		float normalized_sun_y = 0.6f + 0.45f * sun_amount;
-		sun_color = glm::normalize(S * sun_amount) * glm::clamp(sun_direction.y, 0.f, 1.f);
+		sun_color = glm::normalize(S * sun_amount) * glm::clamp(sun_direction.y, 0.f, 1.f) * glm::vec3(2.0);
 		atm_params[9] *= normalized_sun_y;
 	}
 } // namespace Sky

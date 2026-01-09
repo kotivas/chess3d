@@ -57,7 +57,7 @@ namespace CMDUtils {
 		});
 	}
 
-	// --- vec2 ---
+	// --- arr2 ---
 	void Register(const std::string& name, const std::string& desc, std::array<float, 2>& target) {
 		Register(CVar::CVar{
 			name,
@@ -67,7 +67,7 @@ namespace CMDUtils {
 		});
 	}
 
-	// --- vec3 ---
+	// --- arr3 ---
 	void Register(const std::string& name, const std::string& desc, std::array<float, 3>& target) {
 		Register(CVar::CVar{
 			name,
@@ -77,7 +77,7 @@ namespace CMDUtils {
 		});
 	}
 
-	// --- vec4 ---
+	// --- arr4 ---
 	void Register(const std::string& name, const std::string& desc, std::array<float, 4>& target) {
 		Register(CVar::CVar{
 			name,
@@ -96,6 +96,34 @@ namespace CMDUtils {
 				target.x = arr[0];
 				target.y = arr[1];
 				target.z = arr[2];
+			},
+			desc
+		});
+	}
+
+	void Register(const std::string& name, const std::string& desc, glm::vec2& target) {
+		Register(CVar::CVar{
+			name,
+			std::array{target.x, target.y},
+			[&target](const CVar::CVar& cvar) {
+				const auto arr = std::get<std::array<float, 2>>(cvar.val);
+				target.x = arr[0];
+				target.y = arr[1];
+			},
+			desc
+		});
+	}
+
+	void Register(const std::string& name, const std::string& desc, glm::vec4& target) {
+		Register(CVar::CVar{
+			name,
+			std::array{target.x, target.y, target.z, target.w},
+			[&target](const CVar::CVar& cvar) {
+				const auto arr = std::get<std::array<float, 4>>(cvar.val);
+				target.x = arr[0];
+				target.y = arr[1];
+				target.z = arr[2];
+				target.w = arr[3];
 			},
 			desc
 		});

@@ -157,7 +157,7 @@ namespace Console {
 			g_inputField.pop_back();
 	}
 
-	void Draw() {
+	void Draw() { // FIXME IT'S NOT SUPPOSED TO BE HERE
 		if (!g_isVisible) return;
 
 		const MSDFText::FontPtr font = ResourceMgr::GetFontByName("inconsolata_light");
@@ -166,17 +166,17 @@ namespace Console {
 			return;
 		}
 
-		const float& fontScale = g_config.con_fontScale;
-		const int& maxVisibleLines = g_config.con_maxVisibleLines;
+		const float& fontScale = g_config.consoleFontScale;
+		const int& maxVisibleLines = g_config.consoleLines;
 		const float lineHeight = font->lineHeight * fontScale;
-		const float lineyzero = g_config.r_resolution.y - lineHeight;
+		const float lineyzero = Renderer::settings.renderResolution.y - lineHeight;
 
 		const float leftIndent = 5;
 		const float height = lineHeight * (maxVisibleLines + 1) - (font->descender * fontScale) * 2;
-		const float width = g_config.r_resolution.x - leftIndent;
+		const float width = Renderer::settings.renderResolution.x - leftIndent;
 
-		Renderer::DrawRectOnScreen(0, 0, width + leftIndent, height, g_config.con_backgroundColor);
-		Renderer::DrawRectOnScreen(0, height, width + leftIndent, 1, {Color::YELLOW, 1});
+		Renderer::DrawRectOnScreen(0, 0, width + leftIndent, height, g_config.consoleColor);
+		Renderer::DrawRectOnScreen(0, height, width + leftIndent, 1, {1, 1, 0, 1});
 
 		Renderer::DrawText({
 			"> " + g_inputField,

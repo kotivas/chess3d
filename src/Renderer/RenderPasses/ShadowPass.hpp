@@ -29,21 +29,22 @@ namespace Renderer {
 
 	class ShadowPass {
 	public:
-		void init();
+		void init(RenderSettings& settings);
 
 		// TODO change shadow res in runtime
-		void addPointShadow();
+		void addPointShadow(float resolution);
 		void pass(RenderContext& ctx);
 
 		~ShadowPass();
 
 	private:
-		static void drawRenderItem(const RenderItem& item, const Shader* shader);
+		void drawRenderItem(const RenderItem& item, const Shader* shader) const;
 
-		static glm::mat4 calcDirLightSpace(const glm::vec3& light_dir, const Camera::Camera& cam);
-		static glm::mat4 calcSpotLightSpace(const glm::vec3& light_pos, const glm::vec3& light_dir, float fov, float near,
-		                             float far);
-		static std::array<glm::mat4, 6> calcPointLightSpace(const glm::vec3& light_pos, float near, float far, float resolution);
+		glm::mat4 calcDirLightSpace(const glm::vec3& light_dir, const Camera::CameraInfo& cam, float shadow_distance) const;
+		glm::mat4 calcSpotLightSpace(const glm::vec3& light_pos, const glm::vec3& light_dir, float fov, float near,
+		                             float far) const;
+		std::array<glm::mat4, 6> calcPointLightSpace(const glm::vec3& light_pos, float near, float far,
+		                                             float resolution) const;
 
 
 		void drawDirectionalShadow(RenderContext& ctx);

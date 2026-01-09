@@ -11,8 +11,8 @@ namespace GlUtils {
 		auto now = std::chrono::system_clock::now();
 		std::string filepath = directory + "/" + std::format("{:%d-%m-%Y_%H_%M_%S}", now) + ".png";
 
-		const uint16_t width = g_config.sys_windowResolution.x;
-		const uint16_t height = g_config.sys_windowResolution.y;
+		const uint16_t width = g_config.windowResolution.x;
+		const uint16_t height = g_config.windowResolution.y;
 
 		std::vector<uint8_t> pixels(width * height * 3);
 

@@ -14,7 +14,6 @@
 #include "UI/Console/Console.hpp"
 #include "Core/Backend.hpp"
 #include "Core/CMDUtils.hpp"
-#include "Core/CVar.hpp"
 #include "Core/Logger.hpp"
 #include "./Input/Input.hpp"
 #include "AssetManager/AssetManager.hpp"
@@ -28,39 +27,47 @@ void setupScene(Scene& scene) {
 		return;
 	}
 
-	// Renderer::MeshPtr cube = Utils::CreateCubeMesh("lightcube", 100);
-	// cube->transform = {.scale = glm::vec3(.25f)};
-	// cube->material->shader = ResourceMgr::GetShaderByName("LightCube");
-
-	if (const Renderer::MeshPtr plane = Utils::CreatePlaneMesh("plane")) {
+	ResourceMgr::LoadTexture("snow_diffuse", Renderer::TextureType::Tex2D, Renderer::TextureWrapMode::Repeat,
+	                         "assets/textures/snow_diffuse.png");
+	ResourceMgr::LoadTexture("snow_normal", Renderer::TextureType::Tex2D, Renderer::TextureWrapMode::Repeat,
+	                         "assets/textures/snow_normal.png");
+	ResourceMgr::LoadTexture("snow_displacement", Renderer::TextureType::Tex2D, Renderer::TextureWrapMode::Repeat,
+	                         "assets/textures/snow_displace.png");
+	if (const Renderer::MeshPtr plane = Utils::CreatePlaneMesh("plane", 500.f, 64)) {
 		scene.objects.push_back(plane);
-		plane->transform = {.scale = {1000, 1, 1000}};
-		plane->castShadow = false;
-		plane->material->useDiffuse = false;
-		plane->material->solidColor = {0.25, 0.25, 0.25};
+		plane->castShadow = true;
+
+		plane->material->useDiffuse = true;
+		plane->material->diffuse = ResourceMgr::GetTextureByName("snow_diffuse");
+		plane->material->useNormal = true;
+		plane->material->normal = ResourceMgr::GetTextureByName("snow_normal");
+		plane->material->useDisplacement = true;
+		plane->material->displacement = ResourceMgr::GetTextureByName("snow_displacement");
+
+		// plane->material->solidColor = {0.25, 0.25, 0.25};
 		plane->material->shader = base_shader;
-		plane->material->shininess = 100;
+		plane->material->shininess = 50;
 	}
 
 	const auto sky = std::make_shared<Renderer::Sky>();
 	sky->setup();
 
 	sky->shader = AssetManager::g_ShaderManager.getHandle("sky");
-	sky->atm_turbidity = 4.f;
+	sky->atm_turbidity = 3.f;
 	scene.sky = sky;
 
-	const Renderer::MeshPtr cube = Utils::CreateCubeMesh("cube");
-	cube->transform = {
-		.position = {0, 5, 0},
-		.scale = glm::vec3(.50f),
-	};
-	cube->material->solidColor = {0.039f, 0.196f, 0.667f};
-	cube->material->shininess = 100;
-	cube->material->shader = base_shader;
-	scene.objects.push_back(cube);
+	// const Renderer::MeshPtr cube = Utils::CreateCubeMesh("cube");
+	// cube->transform = {
+	// 	.position = {0, 5, 0},
+	// 	.scale = glm::vec3(.50f),
+	// };
+	// cube->material->solidColor = {0.039f, 0.196f, 0.667f};
+	// cube->material->shininess = 100;
+	// cube->material->shader = base_shader;
+	// scene.objects.push_back(cube);
 
 
-	ResourceMgr::LoadModel("glock", "assets/models/glock/Glock-17gen5.fbx", base_shader);
+	// ResourceMgr::LoadModel("glock", "assets/models/glock/Glock-17gen5.fbx", base_shader);
 	if (const Renderer::ModelPtr glock = ResourceMgr::GetModelByName("glock")) {
 		glock->transform = {
 			.position = {-35, 10, 0},
@@ -70,16 +77,17 @@ void setupScene(Scene& scene) {
 		scene.objects.push_back(glock);
 	}
 
-	// ResourceMgr::LoadModel("zdanie", "assets/models/zdanie/zdanie.fbx", base_shader);
+	ResourceMgr::LoadModel("zdanie", "assets/models/zdanie/zdanie.fbx", base_shader);
 	if (const Renderer::ModelPtr zdanie = ResourceMgr::GetModelByName("zdanie")) {
-		zdanie->transform = {.scale = glm::vec3(0.1)};
+		zdanie->transform = {
+			.position = {0, -1, 0},
+			.scale = glm::vec3(0.1)
+		};
 		scene.objects.push_back(zdanie);
 	}
 }
 
 void LoadResources() {
-	// ResourceMgr::LoadTexture("noise3d", Renderer::TextureType::Tex3D, Renderer::TextureWrapMode::Repeat,
-	//                          "assets/textures/noise3d.raw");
 	ResourceMgr::LoadMSDFFont("inconsolata_light", "assets/fonts/inconsolata/inconsolata_light.png",
 	                          "assets/fonts/inconsolata/inconsolata_light.json");
 }
@@ -104,7 +112,6 @@ void LoadAllShaders() {
 	                                   "Shaders/PostEffects/GaussianBlur.frag");
 	AssetManager::g_ShaderManager.load("postfx", "Shaders/PostEffects/PostFX.vert", "Shaders/PostEffects/PostFX.frag");
 	AssetManager::g_ShaderManager.load("depth", "Shaders/Depth.vert", "Shaders/Depth.frag");
-	AssetManager::g_ShaderManager.load("LightCube", "Shaders/LightCube.vert", "Shaders/LightCube.frag");
 	AssetManager::g_ShaderManager.load("solidcolor", "Shaders/2DColor.vert", "Shaders/2DColor.frag");
 	AssetManager::g_ShaderManager.load("2DTexture", "Shaders/2DTexture.vert", "Shaders/2DTexture.frag");
 	AssetManager::g_ShaderManager.load("LightingShader", "Shaders/LightingShader.vert", "Shaders/LightingShader.frag");
@@ -115,9 +122,7 @@ void LoadAllShaders() {
 }
 
 void RegisterCVars(Scene& scene) {
-	CMDUtils::Register("sensitivity", "Mouse responsivity (Float)", g_config.sensitivity, 0, 10);
-
-	CMDUtils::Register("time", "Day time in seconds", scene.time);
+	CMDUtils::Register("time", "Day time in seconds", scene.time, 0, 86400);
 
 	// --- Camera ---
 	CMDUtils::Register("cam_position", "Camera position (Vec3f)", scene.camera.position);
@@ -152,47 +157,41 @@ void RegisterCVars(Scene& scene) {
 	CMDUtils::Register("spot_diffuse", "Spot light diffuse (Vec3f)", scene.spot_light.diffuse);
 	CMDUtils::Register("spot_specular", "Spot light specular (Vec3f)", scene.spot_light.specular);
 
-	// --- Rendering ---
-	CMDUtils::Register("r_blurPasses", "Number of bloom blur passes", g_config.r_blurPasses, 0.f, 50.f);
-	CMDUtils::Register("r_gamma", "Adjusts screen gamma correction (Float)", g_config.r_gamma, 0.f, 4.f);
-	CMDUtils::Register("r_shadowRes", "Shadow map resolution (Integer)", g_config.r_shadowRes, 512.f, 8192.f);
-	CMDUtils::Register("r_renderDistance", "Maximum render distance (Float)", g_config.r_renderDistance, 1.f, 5000.f);
-	CMDUtils::Register("r_vsync", "Vertical synchronization (Boolean)", g_config.r_vsync);
-	// --- Console ---
-	CMDUtils::Register("con_fontScale", "Console font size scale (Float)", g_config.con_fontScale, 8.f, 128.f);
-	CMDUtils::Register("con_maxVisibleLines", "Maximum visible console lines (Integer)", g_config.con_maxVisibleLines,
-	                   5.f, 100.f);
-	CMDUtils::Register(CVar::cvar_t(
-		"con_backgroundColor",
-		static_cast<std::array<float, 4>>(g_config.con_backgroundColor),
-		[](const CVar::cvar_t& cvar) {
-			g_config.con_backgroundColor = std::get<std::array<float, 4>>(cvar.val);
-		},
-		"Console background color (RGBA)"
-	));
-	// --- Post-processing / Effects ---
-	CMDUtils::Register("fx_bloom", "Enable bloom effect (Boolean)", g_config.fx_bloom);
-	CMDUtils::Register("fx_saturation", "Intensity of the color (Float)", g_config.fx_saturation, 0.0, 100);
-	CMDUtils::Register("fx_chromaticOffset", "Strength of chromatic abberation (Float)", g_config.fx_chromaticOffset);
-	CMDUtils::Register("fx_exposure", "Exposure (Float)", g_config.fx_exposure, 0.1, 10);
-	CMDUtils::Register("fx_autoExposureSpeed", "Speed of automatic exposure (Float)", g_config.fx_autoExposureSpeed,
-	                   0.f, 1.f);
-	CMDUtils::Register("fx_autoExposure",
-	                   "Automatic adjustment of scene exposure to simulate eye adaptation from changes in brightness (Boolean)",
-	                   g_config.fx_autoExposure);
-	CMDUtils::Register("fx_quantization", "Enable color quantization (Boolean)", g_config.fx_quantization);
-	CMDUtils::Register("fx_quantizationLevel", "Color quantization level (Integer)", g_config.fx_quantizationLevel, 2.f,
-	                   16.f);
-	CMDUtils::Register("fx_vignette", "Enable vignette effect (Boolean)", g_config.fx_vignette);
-	CMDUtils::Register("fx_vignetteIntensity", "Vignette intensity (Float)", g_config.fx_vignetteIntensity, 0.f, 1.f);
-	CMDUtils::Register(CVar::cvar_t(
-		"fx_vignetteColor",
-		static_cast<std::array<float, 3>>(g_config.fx_vignetteColor),
-		[](const CVar::cvar_t& cvar) {
-			g_config.fx_vignetteColor = std::get<std::array<float, 3>>(cvar.val);
-		},
-		"Vignette color (RGB)"
-	));
+	// ========================= cl_ (Client / Input) =========================
+	CMDUtils::Register("cl_sens", "Mouse sensitivity multiplier.", g_config.sensitivity, 0.01f, 10.0f);
+	// ========================= vid_ (Window / Video) =========================
+	CMDUtils::Register("vid_resolution", "Window resolution (width height).", g_config.windowResolution);
+	CMDUtils::Register("vid_vsync", "Enable vertical synchronization.", Renderer::settings.vsync);
+	// ========================= con_ (Console / UI) =========================
+	CMDUtils::Register("con_fontscale", "Console font scale in pixels.", g_config.consoleFontScale, 8, 200);
+	CMDUtils::Register("con_lines", "Number of visible console lines.", g_config.consoleLines, 1, 200);
+	CMDUtils::Register("con_color", "Console background color (RGBA).", g_config.consoleColor);
+	// ========================= sv_ (World / Simulation) =========================
+	CMDUtils::Register("sv_time", "World time in seconds (0..86400).", scene.time, 0.0f, 86400.0f);
+	// ========================= r_atm_ (Atmosphere / Sky) =========================
+	CMDUtils::Register("r_atm_turbidity", "Atmospheric turbidity (higher = hazier sky).", scene.sky->atm_turbidity, 1.0f, 50.0f);
+	// ========================= r_ (Post-processing / FX) =========================
+	CMDUtils::Register("r_bloom", "Enable bloom post-process.", Renderer::settings.FX.bloom);
+	CMDUtils::Register("r_chromatic_aberration", "Chromatic aberration offset.", Renderer::settings.FX.chromaticOffset, 0.0f, 0.2f);
+	CMDUtils::Register("r_color_quantization", "Enable color quantization.", Renderer::settings.FX.quantization);
+	CMDUtils::Register("r_color_levels", "Color quantization levels.", Renderer::settings.FX.quantizationLevel, 2.0f, 256.0f);
+	CMDUtils::Register("r_vignette", "Enable vignette effect.", Renderer::settings.FX.vignette);
+	CMDUtils::Register("r_vignette_intensity", "Vignette intensity.", Renderer::settings.FX.vignetteIntensity, 0.0f, 2.0f);
+	CMDUtils::Register("r_vignette_color", "Vignette color (RGB).", Renderer::settings.FX.vignetteColor);
+	CMDUtils::Register("r_saturation", "Color saturation multiplier.", Renderer::settings.FX.saturation, 0.0f, 3.0f);
+	CMDUtils::Register("r_exposure", "Manual exposure multiplier.", Renderer::settings.FX.exposure, 0.01f, 10.0f);
+	CMDUtils::Register("r_gamma", "Gamma correction value.", Renderer::settings.FX.gamma, 0.5f, 4.0f);
+	// ========================= mat_ (Materials / Surface) =========================
+	CMDUtils::Register("mat_parallax_scale", "Parallax mapping height scale.", Renderer::settings.parallaxScale, 0.0f, 1.0f);
+	// ========================= r_shadow_ (Shadows) =========================
+	CMDUtils::Register("r_shadow_distance", "Maximum distance where shadows are rendered.", Renderer::settings.shadowDistance, 0.0f, 5000.0f);
+	CMDUtils::Register("r_shadow_dir_res", "Directional light shadow map resolution.", Renderer::settings.dirShadowRes, 256, 16384);
+	CMDUtils::Register("r_shadow_point_res", "Point light shadow cubemap resolution.", Renderer::settings.pointShadowRes, 128, 4096);
+	CMDUtils::Register("r_shadow_spot_res", "Spot light shadow map resolution.", Renderer::settings.spotShadowRes, 128, 8192);
+	// ========================= r_ (Rendering / Culling) =========================
+	CMDUtils::Register("r_render_distance", "World render distance (culling / dir light projection).", Renderer::settings.renderDistance, 16.0f, 10000.0f);
+	CMDUtils::Register("r_render_resolution", "Internal rendering resolution.", Renderer::settings.renderResolution);
+	CMDUtils::Register("r_blur_passes", "Number of blur passes for post-processing.", Renderer::settings.blurPasses, 0, 8);
 }
 
 void updateControls(Scene& scene) {
@@ -200,12 +199,12 @@ void updateControls(Scene& scene) {
 	if (Input::IsKeyPressed(Key::GraveAccent)) Console::Toggle();
 	if (Input::IsKeyPressed(Key::F11)) GlUtils::SaveFrame("screenshot");
 	if (Input::IsKeyPressed(Key::L) && !Console::g_isVisible) scene.spot_light.enable = !scene.spot_light.enable;
-	if (Input::IsKeyPressed(Key::R)) ReloadShaders();
+	if (Input::IsKeyPressed(Key::R) && !Console::g_isVisible) ReloadShaders();
 	if (Input::IsKeyPressed(Key::Pause)) g_isPaused = !g_isPaused;
 
 	if (Input::g_resizedHeight || Input::g_resizedWidth) {
 		if (Input::g_resizedWidth == 0 && Input::g_resizedHeight == 0) return; // in case of minimizing
-		g_config.sys_windowResolution = {Input::g_resizedWidth, Input::g_resizedHeight};
+		g_config.windowResolution = {Input::g_resizedWidth, Input::g_resizedHeight};
 		// g_config.r_resolution = {Input::g_resizedWidth, Input::g_resizedHeight};
 		// Renderer::UpdateRenderRes();
 	}
@@ -214,38 +213,45 @@ void updateControls(Scene& scene) {
 int main(int argc, char** argv) {
 	g_config = {
 		.sensitivity = 0.1f,
-
-		.sys_windowResolution = {1280, 720},
-
-		.fx_bloom = false,
-		.fx_chromaticOffset = 0.000f,
-		.fx_quantization = false,
-		.fx_quantizationLevel = 4,
-		.fx_vignette = true,
-		.fx_vignetteIntensity = 0.25f,
-		.fx_saturation = 1.f,
-		.fx_exposure = 1.f,
-		.fx_autoExposure = true,
-		.fx_autoExposureSpeed = 0.02f,
-		.fx_vignetteColor = {0, 0, 0},
-
-		.r_blurPasses = 3,
-		.r_gamma = 1,
-		.r_resolution = {1920, 1080},
-		.r_shadowRes = 1024,
-		.r_renderDistance = 1000.f,
-		.r_vsync = false,
-
-		.con_fontScale = 25,
-		.con_maxVisibleLines = 15,
-		.con_backgroundColor = {0, 0, 0, 0.9},
+		.windowResolution = {1280, 720},
+		.autoExposure = true,
+		.autoExposureSpeed = 0.02f,
+		.consoleFontScale = 25,
+		.consoleLines = 15,
+		.consoleColor = {0, 0, 0, 0.9},
 	};
+
+	Renderer::settings = {
+		.FX = {
+			.bloom = false,
+			.chromaticOffset = 0.f,
+			.quantization = false,
+			.quantizationLevel = 4.f,
+			.vignette = false,
+			.vignetteIntensity = 0.25f,
+			.vignetteColor = {0, 0, 0},
+			.saturation = 1.f,
+			.exposure = 1.f,
+			.gamma = 1,
+		},
+
+		.parallaxScale = 0.1,
+		.shadowDistance = 200.f,
+		.dirShadowRes = 4096,
+		.pointShadowRes = 1024,
+		.spotShadowRes = 2048,
+		.renderDistance = 1000.f,
+		.renderResolution = {1920, 1080},
+		.blurPasses = 4,
+		.vsync = false,
+	};
+
 	Scene scene{
-		.camera = Camera::Camera(75, glm::vec3(0, 17, 0), 0.1, g_config.r_renderDistance),
+		.camera = Camera::CameraInfo(75, glm::vec3(0, 17, 0), 0.1, Renderer::settings.renderDistance),
 		.dir_light = {
 			.enable = 1,
 			.direction = glm::normalize(glm::vec3(-1.0f, -1.0f, -1.0f)),
-			.ambient = glm::vec3(0.1f), // subtle ambient
+			.ambient = glm::vec3(0.2f), // subtle ambient
 			.diffuse = glm::vec3(0.95f), // strong diffuse
 			.specular = glm::vec3(0.2f) // modest specular
 		},
@@ -272,7 +278,6 @@ int main(int argc, char** argv) {
 			.diffuse = glm::vec3(1.0f),
 			.specular = glm::vec3(1.0f)
 		}
-
 	};
 
 	Log::Init();
@@ -290,7 +295,7 @@ int main(int argc, char** argv) {
 	setupScene(scene);
 	RegisterCVars(scene);
 
-	scene.time = 30000;
+	scene.time = 3000;
 	double last_time = glfwGetTime();
 	while (!glfwWindowShouldClose(Renderer::g_window)) {
 		const double dt = glfwGetTime() - last_time;
@@ -298,7 +303,7 @@ int main(int argc, char** argv) {
 
 		// UPDATE
 		if (!g_isPaused) {
-			scene.time += dt * 100;
+			scene.time += dt * 1;
 			scene.time = fmod(scene.time, 86400);
 
 			camera_controller.update(scene.camera, dt);

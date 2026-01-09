@@ -82,15 +82,15 @@ namespace Utils {
 		return std::array{vals[0], vals[1], vals[2], vals[3]};
 	}
 
-	Renderer::MeshPtr CreatePlaneMesh(const std::string& name) {
+	Renderer::MeshPtr CreatePlaneMesh(const std::string& name, float size, float tile) {
 		Renderer::MeshPtr mesh = std::make_shared<Renderer::Mesh>(name);
 		mesh->material = std::make_shared<Renderer::Material>(name);
 		mesh->name = name;
 		mesh->vertices = {
-			{{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-			{{0.5f, 0.0f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-			{{0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-			{{-0.5f, 0.0f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+			{{-size, 0.0f, -size}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}, {1,0,0}},
+			{{size, 0.0f, -size}, {0.0f, 1.0f, 0.0f}, {tile, 0.0f}, {1,0,0}},
+			{{size, 0.0f, size}, {0.0f, 1.0f, 0.0f}, {tile, tile}, {1,0,0}},
+			{{-size, 0.0f, size}, {0.0f, 1.0f, 0.0f}, {0.0f, tile}, {1,0,0}}
 		};
 		mesh->indices = {0, 2, 1, 0, 3, 2};
 		mesh->setup();

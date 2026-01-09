@@ -26,9 +26,9 @@ namespace Renderer {
 	void UpdateRenderRes();
 
 	void DrawText(const MSDFText::Text& text);
-	void DrawSky(SkyPtr sky, const Camera::Camera& cam, float time);
+	void DrawSky(SkyPtr sky, const Camera::CameraInfo& cam, float time);
 	void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h);
-	void DrawRectOnScreen(float x, float y, float w, float h, const Color::rgba_t& color);
+	void DrawRectOnScreen(float x, float y, float w, float h, const glm::vec4& color);
 	void DrawDebug(int fps, float scale, float time, glm::vec3 cam_pos);
 
 	void GenerateRenderItem(const std::shared_ptr<Drawable>& drawable, std::vector<RenderItem>& items);
@@ -62,5 +62,6 @@ namespace Renderer {
 	static AssetManager::ShaderHandle postfxShader;
 	static AssetManager::ShaderHandle msdfTextShader;
 
+	inline RenderSettings settings;
 	inline GLFWwindow* g_window = nullptr;
 };

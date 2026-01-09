@@ -21,7 +21,7 @@ namespace Utils {
 	std::string ReadFromFile(const std::string& path);
 	Renderer::MeshPtr CreateSphereMesh(const std::string& name, float radius, uint32_t stackCount, uint32_t sliceCount);
 	Renderer::MeshPtr CreateCubeMesh(const std::string& name);
-	Renderer::MeshPtr CreatePlaneMesh(const std::string& name);
+	Renderer::MeshPtr CreatePlaneMesh(const std::string& name, float size, float tile);
 	void SaveAsPNG(const std::string& path, std::vector<uint8_t>& pixels, uint16_t w, uint16_t h, uint16_t channels);
 
 	template <typename T>

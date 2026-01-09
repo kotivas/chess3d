@@ -31,15 +31,17 @@ void main(void) {
     float cos_gamma = dot(V, uSunDirection);
     float gamma = acos(cos_gamma);
 
-    vec3 skyColor = uAtmParams[9] * HosekWilkie(cos_theta, gamma, cos_gamma);
+    vec3 skyColor = uAtmParams[9] * 1 * HosekWilkie(cos_theta, gamma, cos_gamma);
     if (cos_gamma > 0) {
-        skyColor = skyColor + pow(vec3(cos_gamma), vec3(256)) * 0.5;
+        skyColor = skyColor + pow(vec3(cos_gamma), vec3(512));
     }
 
     // imitates night
     float sunAlt = asin(uSunDirection.y);
-    float dayFactor = clamp( sunAlt / 0.1, 0.0, 1.0);
+    float dayFactor = clamp( sunAlt / 0.3, 0.0, 1.0);
     skyColor *= dayFactor;
+
+    skyColor = clamp(skyColor, 0, 1); // temp
 
     FragColor = vec4(skyColor, 1.0);
     BrightColor = vec4(0, 0, 0, 1.0);

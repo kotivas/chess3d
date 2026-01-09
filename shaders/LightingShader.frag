@@ -9,6 +9,8 @@ struct Material {
     bool useSpecular;
     sampler2D normal;
     bool useNormal;
+    sampler2D displacement;
+    bool useDisplacement;
     float shininess;
     vec3 solidColor;
 };
@@ -66,15 +68,17 @@ layout(std140, binding = 1) uniform Lights {
     SpotLight spotLight;
 };
 
-layout(std140, binding = 2) uniform Data {
-    vec3 viewPos;
-    float farPlane;
-};
-
+uniform vec3 viewPos;
+uniform float farPlane;
+uniform float nearPlane;
+uniform Material material;
 uniform sampler2D spotShadowMap;
 uniform sampler2D dirShadowMap;
 uniform samplerCube omniShadowMap;
-uniform Material material;
+
+uniform float parallaxScale;
+const float ParallaxLayersMin = 8;
+const float ParallaxLayersMax = 32;
 
 // array of offset direction for sampling
 vec3 gridSamplingDisk[20] = vec3[] (
@@ -107,9 +111,7 @@ float PCF_Shadow(vec4 fragPosLightSpace, sampler2D shadowMap) {
     shadow /= float((range * 2 + 1) * (range * 2 + 1));
 
     // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
-    if (projCoords.z > 1.0 ||
-    projCoords.x < 0.0 || projCoords.x > 1.0 ||
-    projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
 
     return shadow;
 }
@@ -133,7 +135,7 @@ float PCF_Shadow(vec3 fragPos, vec3 lightPos, samplerCube shadowCubemap) {
     return shadow;
 }
 
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 diffuse_color) {
+vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 diffuse_color, vec2 texCoords) {
     vec3 lightDir = normalize(-light.direction);
     // diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
@@ -143,13 +145,13 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, vec3 diffuse_color)
     // combine results
     vec3 ambient = light.ambient * diffuse_color;
     vec3 diffuse = light.diffuse * diff * diffuse_color;
-    vec3 specular = light.specular * spec * vec3(texture(material.specular, fs_in.TexCoords));
+    vec3 specular = light.specular * spec * vec3(texture(material.specular, texCoords));
 
     float shadow = PCF_Shadow(fs_in.DirFragPosLightSpace, dirShadowMap);
 
     return ambient + (1.0 - shadow) * (diffuse + specular);
 }
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 diffuse_color) {
+vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 diffuse_color, vec2 texCoords) {
     vec3 lightDir = normalize(light.position - fragPos);
     // diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
@@ -163,7 +165,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, v
     // combine results
     vec3 ambient = light.ambient * diffuse_color;
     vec3 diffuse = light.diffuse * diff * diffuse_color;
-    vec3 specular = light.specular * spec * vec3(texture(material.specular, fs_in.TexCoords));
+    vec3 specular = light.specular * spec * vec3(texture(material.specular, texCoords));
     ambient *= attenuation;
     diffuse *= attenuation;
     specular *= attenuation;
@@ -172,7 +174,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, v
 
     return ambient + (1.0 - shadow) * (diffuse + specular);
 }
-vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 diffuse_color) {
+vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 diffuse_color, vec2 texCoords) {
     vec3 lightDir = normalize(light.position - fragPos);
     // diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
@@ -189,7 +191,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec
     // combine results
     vec3 ambient = light.ambient * diffuse_color;
     vec3 diffuse = light.diffuse * diff * diffuse_color;
-    vec3 specular = light.specular * spec * vec3(texture(material.specular, fs_in.TexCoords));
+    vec3 specular = light.specular * spec * vec3(texture(material.specular, texCoords));
     ambient *= attenuation * intensity;
     diffuse *= attenuation * intensity;
     specular *= attenuation * intensity;
@@ -199,33 +201,77 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir, vec
     return ambient + (1.0 - shadow) * (diffuse + specular);
 }
 
-vec3 CalcBumpedNormal() {
+vec3 BumpedNormal(vec2 texCoords, mat3 TBN) {
+    vec3 BumpMapNormal = texture(material.normal, texCoords).xyz;
+    BumpMapNormal = 2.0 * BumpMapNormal - vec3(1.0, 1.0, 1.0);
+    return normalize(TBN * BumpMapNormal);
+}
+
+vec2 Parallax(vec2 texCoords, vec3 viewDir){
+    // number of depth layers
+    float numLayers = mix(ParallaxLayersMax, ParallaxLayersMin, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));
+    // calculate the size of each layer
+    float layerDepth = 1.0 / numLayers;
+    // depth of current layer
+    float currentLayerDepth = 0.0;
+    // the amount to shift the texture coordinates per layer (from vector P)
+    vec2 P = viewDir.xy / viewDir.z * parallaxScale;
+    vec2 deltaTexCoords = P / numLayers;
+
+    // get initial values
+    vec2  currentTexCoords     = texCoords;
+    float currentDepthMapValue = texture(material.displacement, currentTexCoords).r;
+
+    while(currentLayerDepth < currentDepthMapValue)
+    {
+        // shift texture coordinates along direction of P
+        currentTexCoords -= deltaTexCoords;
+        // get depthmap value at current texture coordinates
+        currentDepthMapValue = texture(material.displacement, currentTexCoords).r;
+        // get depth of next layer
+        currentLayerDepth += layerDepth;
+    }
+
+    // get texture coordinates before collision (reverse operations)
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+    // get depth after and before collision for linear interpolation
+    float afterDepth  = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = texture(material.displacement, prevTexCoords).r - currentLayerDepth + layerDepth;
+
+    // interpolation of texture coordinates
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+    return finalTexCoords;
+}
+
+mat3 TBN(){
     vec3 Normal = normalize(fs_in.Normal);
     vec3 Tangent = normalize(fs_in.Tangent);
     Tangent = normalize(Tangent - dot(Tangent, Normal) * Normal);
     vec3 Bitangent = cross(Tangent, Normal);
-    vec3 BumpMapNormal = texture(material.normal, fs_in.TexCoords).xyz;
-    BumpMapNormal = 2.0 * BumpMapNormal - vec3(1.0, 1.0, 1.0);
-    vec3 NewNormal;
-    mat3 TBN = mat3(Tangent, Bitangent, Normal);
-    NewNormal = TBN * BumpMapNormal;
-    NewNormal = normalize(NewNormal);
-    return NewNormal;
+    return mat3(Tangent, Bitangent, Normal);
 }
 
 void main() {
     vec3 viewDir = normalize(viewPos - fs_in.FragPos);
     vec3 result = vec3(0);
+    mat3 TBN = TBN();
 
+    vec2 texCoords = fs_in.TexCoords;
     vec3 diffuse = material.solidColor;
     vec3 normal = normalize(fs_in.Normal);
 
-    if (material.useDiffuse) diffuse = texture(material.diffuse, fs_in.TexCoords).rgb;
-    if (material.useNormal) normal = CalcBumpedNormal();
+    if (material.useDisplacement) texCoords = Parallax(texCoords, normalize(TBN * viewDir));
+    if (material.useDiffuse) diffuse = texture(material.diffuse, texCoords).rgb;
+    if (material.useNormal) normal = BumpedNormal(texCoords, TBN);
 
-    if (dirLight.draw == 1)   result += CalcDirLight(dirLight, normal, viewDir, diffuse);
-    if (pointLight.draw == 1) result += CalcPointLight(pointLight, normal, fs_in.FragPos, viewDir, diffuse);
-    if (spotLight.draw == 1)  result += CalcSpotLight(spotLight, normal, fs_in.FragPos, viewDir, diffuse);
+//    if (texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0) discard;
+
+    if (dirLight.draw == 1)   result += CalcDirLight(dirLight, normal, viewDir, diffuse, texCoords);
+    if (pointLight.draw == 1) result += CalcPointLight(pointLight, normal, fs_in.FragPos, viewDir, diffuse, texCoords);
+    if (spotLight.draw == 1)  result += CalcSpotLight(spotLight, normal, fs_in.FragPos, viewDir, diffuse, texCoords);
 
     FragColor = vec4(result, 1.0);
 

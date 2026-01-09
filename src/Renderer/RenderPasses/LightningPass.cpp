@@ -7,7 +7,6 @@ namespace Renderer {
 	void LightningPass::init() {
 		createUboMatrices();
 		createUboLights();
-		createUboData();
 	}
 
 	void LightningPass::createUboMatrices() {
@@ -36,16 +35,6 @@ namespace Renderer {
 		                  sizeof(DirLight) + sizeof(PointLight) + sizeof(SpotLight));
 	}
 
-	void LightningPass::createUboData() {
-		glGenBuffers(1, &_ubo_data);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, _ubo_data);
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec3) + sizeof(float), nullptr, GL_STATIC_DRAW);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-		glBindBufferRange(GL_UNIFORM_BUFFER, 2, _ubo_data, 0, sizeof(glm::vec3) + sizeof(float));
-	}
-
 	void LightningPass::updateUboMatrices(const glm::mat4& projection, const glm::mat4& view,
 	                                      const glm::mat4& dir_light_space_matrix,
 	                                      const glm::mat4& spot_light_space_matrix) const {
@@ -72,27 +61,17 @@ namespace Renderer {
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
-	void LightningPass::updateUboData(const glm::vec3& viewPos, const float far_plane) const {
-		glBindBuffer(GL_UNIFORM_BUFFER, _ubo_data);
-
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(viewPos), glm::value_ptr(viewPos));
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec3), sizeof(float), &far_plane);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	}
-
 	void LightningPass::pass(const RenderContext& ctx) const {
-		glViewport(0, 0, ctx.render_width, ctx.render_height);
-		glBindFramebuffer(GL_FRAMEBUFFER, ctx.target_fbo);
+		glViewport(0, 0, ctx.settings.renderResolution.x, ctx.settings.renderResolution.y);
+		glBindFramebuffer(GL_FRAMEBUFFER, ctx.target_framebuffer);
 
 		glEnable(GL_DEPTH_TEST);
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
 
-		updateUboLights(ctx.scene.dir_light, ctx.scene.point_light, ctx.scene.spot_light);
-		updateUboData(ctx.scene.camera.position, ctx.far);
-		updateUboMatrices(ctx.scene.camera.projectionMatrix, ctx.scene.camera.viewMatrix,
+		updateUboLights(ctx.light_info.directional, ctx.light_info.point, ctx.light_info.spot);
+		updateUboMatrices(ctx.camera.projectionMatrix, ctx.camera.viewMatrix,
 		                  ctx.dir_shadow.light_space, ctx.spot_shadow.light_space);
 
 		glActiveTexture(GL_TEXTURE0);
@@ -114,10 +93,17 @@ namespace Renderer {
 		else
 			glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-		for (const auto& item : ctx.render_items) drawRenderItem(item);
+		ShaderUniforms uniforms{
+			.nearPlane = ctx.camera.nearPlane,
+			.farPlane = ctx.camera.farPlane,
+			.viewPos = ctx.camera.position,
+			.parallaxScale = ctx.settings.parallaxScale,
+		};
+
+		for (const auto& item : ctx.render_items) drawRenderItem(item, uniforms);
 	}
 
-	void LightningPass::drawRenderItem(const RenderItem& item) {
+	void LightningPass::drawRenderItem(const RenderItem& item, const ShaderUniforms& unifs) const {
 		if (!item.mesh->material) {
 			Log::Error("Renderer::DrawMesh material is not exist");
 			return;
@@ -132,18 +118,27 @@ namespace Renderer {
 
 		shader->use();
 
+		shader->setUniform1f("farPlane", unifs.farPlane);
+		shader->setUniform1f("nearPlane", unifs.nearPlane);
+		shader->setUniform3f("viewPos", unifs.viewPos);
+
+		shader->setUniform1f("parallaxScale", unifs.parallaxScale);
+
 		glActiveTexture(GL_TEXTURE3);
 		glBindTexture(GL_TEXTURE_2D, item.material->diffuse);
 		glActiveTexture(GL_TEXTURE4);
 		glBindTexture(GL_TEXTURE_2D, item.material->specular);
 		glActiveTexture(GL_TEXTURE5);
 		glBindTexture(GL_TEXTURE_2D, item.material->normal);
+		glActiveTexture(GL_TEXTURE6);
+		glBindTexture(GL_TEXTURE_2D, item.material->displacement);
 
 		shader->setUniform1f("material.shininess", item.material->shininess);
 		shader->setUniform3f("material.solidColor", item.material->solidColor);
 		shader->setUniform1i("material.useDiffuse", item.material->useDiffuse);
 		shader->setUniform1i("material.useSpecular", item.material->useSpecular);
 		shader->setUniform1i("material.useNormal", item.material->useNormal);
+		shader->setUniform1i("material.useDisplacement", item.material->useDisplacement);
 
 		shader->setUniform1i("dirShadowMap", 0);
 		shader->setUniform1i("spotShadowMap", 1);
@@ -151,6 +146,7 @@ namespace Renderer {
 		shader->setUniform1i("material.diffuse", 3);
 		shader->setUniform1i("material.specular", 4);
 		shader->setUniform1i("material.normal", 5);
+		shader->setUniform1i("material.displacement", 6);
 
 		shader->setUniformMat4fv("uModel", GL_FALSE, item.world_transform);
 		glBindVertexArray(item.mesh->VAO);

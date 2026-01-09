@@ -1,5 +1,8 @@
 #pragma once
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+
 #include "CVar.hpp"
 
 namespace CMDUtils {
@@ -9,8 +12,10 @@ namespace CMDUtils {
 	void Register(const std::string& name, const std::string& desc, bool& target);
 	void Register(const std::string& name, const std::string& desc, std::array<float, 2>& target);
 	void Register(const std::string& name, const std::string& desc, std::array<float, 3>& target);
-	void Register(const std::string& name, const std::string& desc, glm::vec3& target);
 	void Register(const std::string& name, const std::string& desc, std::array<float, 4>& target);
+	void Register(const std::string& name, const std::string& desc, glm::vec2& target);
+	void Register(const std::string& name, const std::string& desc, glm::vec3& target);
+	void Register(const std::string& name, const std::string& desc, glm::vec4& target);
 	std::string ToString(const CVar::cvar_t::CVarValue& val);
 
 	void Unregister(const std::string& name);

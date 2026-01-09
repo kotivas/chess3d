@@ -6,8 +6,8 @@
 #include "Input/Input.hpp"
 
 namespace Camera {
-	void OrbitCameraController::update(Camera& cam, double dt) {
-		cam.calcProjMat(g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
+	void OrbitCameraController::update(CameraInfo& cam, double dt) {
+		cam.calcProjMat(g_config.windowResolution.x, g_config.windowResolution.y);
 		cam.position = glm::vec3(
 			_target.x + _radius * cos(glm::radians(cam.yaw)) * cos(glm::radians(cam.pitch)),
 			_target.y + _radius * sin(glm::radians(cam.pitch)),
@@ -17,7 +17,7 @@ namespace Camera {
 		cam.viewMatrix = glm::lookAt(cam.position, _target, glm::vec3(0.0f, 1.0f, 0.0f));
 	}
 
-	void OrbitCameraController::handleControls(Camera& cam) {
+	void OrbitCameraController::handleControls(CameraInfo& cam) {
 		if (Input::IsRightMouseDown()) {
 			double xoffset = Input::GetMouseX() - _lastx;
 			double yoffset = Input::GetMouseY() - _lasty;
@@ -43,8 +43,8 @@ namespace Camera {
 		}
 	}
 
-	void FPSCameraController::update(Camera& cam, double dt) {
-		cam.calcProjMat(g_config.sys_windowResolution.x, g_config.sys_windowResolution.y);
+	void FPSCameraController::update(CameraInfo& cam, double dt) {
+		cam.calcProjMat(g_config.windowResolution.x, g_config.windowResolution.y);
 		cam.forward = {
 			cos(glm::radians(cam.pitch)) * cos(glm::radians(cam.yaw)),
 			sin(glm::radians(cam.pitch)),
@@ -53,7 +53,7 @@ namespace Camera {
 		cam.viewMatrix = glm::lookAt(cam.position, cam.position + cam.forward, {0, 1, 0});
 	}
 
-	void FPSCameraController::handleControls(Camera& cam) {
+	void FPSCameraController::handleControls(CameraInfo& cam) {
 		if ( Console::IsVisible() ) {
 			_lastx = static_cast<float>(Input::GetMouseX());
 			_lasty = static_cast<float>(Input::GetMouseY());

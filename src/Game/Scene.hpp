@@ -8,7 +8,7 @@
 
 struct Scene {
 	std::vector<std::shared_ptr<Renderer::Drawable>> objects;
-	Camera::Camera camera;
+	Camera::CameraInfo camera;
 	float time; // in seconds 24hours
 
 	Renderer::SkyPtr sky;
