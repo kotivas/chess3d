@@ -3,8 +3,8 @@
 
 namespace Game {
 
-	void Init();
-	void Update(float deltaTime);
-	void Shutdown();
+    void Init();
+    void Update(float deltaTime);
+    void Shutdown();
 
-}
+} // namespace Game

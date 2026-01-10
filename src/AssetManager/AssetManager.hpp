@@ -2,5 +2,5 @@
 #include "AssetManager/ShaderManager.hpp"
 
 namespace AssetManager {
-	inline ShaderManager g_ShaderManager;
+    inline ShaderManager g_shaderManager;
 }

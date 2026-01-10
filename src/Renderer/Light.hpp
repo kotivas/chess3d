@@ -1,45 +1,46 @@
 #pragma once
+#include <glm/vec3.hpp>
 
 namespace Renderer {
-	struct DirLight {
-		int enable;
+    struct DirLight {
+        int enable;
 
-		alignas(16) glm::vec3 direction;
+        alignas(16) glm::vec3 direction;
 
-		alignas(16) glm::vec3 ambient;
-		alignas(16) glm::vec3 diffuse;
-		alignas(16) glm::vec3 specular;
-	};
+        alignas(16) glm::vec3 ambient;
+        alignas(16) glm::vec3 diffuse;
+        alignas(16) glm::vec3 specular;
+    };
 
-	struct PointLight {
-		int enable;
+    struct PointLight {
+        int enable;
 
-		alignas(16) glm::vec3 position;
+        alignas(16) glm::vec3 position;
 
-		float constant;
-		float linear;
-		float quadratic;
+        float constant;
+        float linear;
+        float quadratic;
 
-		alignas(16) glm::vec3 ambient;
-		alignas(16) glm::vec3 diffuse;
-		alignas(16) glm::vec3 specular;
-	};
+        alignas(16) glm::vec3 ambient;
+        alignas(16) glm::vec3 diffuse;
+        alignas(16) glm::vec3 specular;
+    };
 
-	struct SpotLight {
-		int enable;
+    struct SpotLight {
+        int enable;
 
-		alignas(16) glm::vec3 position;
-		alignas(16) glm::vec3 direction;
+        alignas(16) glm::vec3 position;
+        alignas(16) glm::vec3 direction;
 
-		float cutOff;
-		float outerCutOff;
+        float cutOff;
+        float outerCutOff;
 
-		float constant;
-		float linear;
-		float quadratic;
+        float constant;
+        float linear;
+        float quadratic;
 
-		alignas(16) glm::vec3 ambient;
-		alignas(16) glm::vec3 diffuse;
-		alignas(16) glm::vec3 specular;
-	};
-}
+        alignas(16) glm::vec3 ambient;
+        alignas(16) glm::vec3 diffuse;
+        alignas(16) glm::vec3 specular;
+    };
+} // namespace Renderer

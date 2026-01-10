@@ -3,38 +3,38 @@
 #include <glm/vec3.hpp>
 
 namespace Renderer {
-	struct PostFXSettings {
-		bool bloom;
+    struct PostFXSettings {
+        bool bloom;
 
-		float chromaticOffset;
+        float chromaticOffset;
 
-		bool quantization;
-		float quantizationLevel;
+        bool quantization;
+        float quantizationLevel;
 
-		bool vignette;
-		float vignetteIntensity;
-		glm::vec3 vignetteColor;
+        bool vignette;
+        float vignetteIntensity;
+        glm::vec3 vignetteColor;
 
-		float saturation;
-		float exposure;
-		float gamma;
-	};
+        float saturation;
+        float exposure;
+        float gamma;
+    };
 
-	struct RenderSettings {
-		PostFXSettings FX;
+    struct RenderSettings {
+        PostFXSettings FX;
 
-		float parallaxScale;
-		float shadowDistance;
+        float parallaxScale;
+        float shadowDistance;
 
-		float dirShadowRes;
-		float pointShadowRes;
-		float spotShadowRes;
+        float dirShadowRes;
+        float pointShadowRes;
+        float spotShadowRes;
 
-		float renderDistance;
-		glm::vec2 renderResolution;
+        float renderDistance;
+        glm::vec2 renderResolution;
 
-		int blurPasses;
+        int blurPasses;
 
-		bool vsync;
-	};
-}
+        bool vsync;
+    };
+} // namespace Renderer

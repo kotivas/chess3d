@@ -1,0 +1,4 @@
+title: Inconsolata
+author: Raph Levien
+license: OFL-1.1
+source: https://fonts.google.com/specimen/Inconsolata

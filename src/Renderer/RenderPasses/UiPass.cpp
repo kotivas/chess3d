@@ -1,4 +1,3 @@
 #include "UiPass.hpp"
 
-namespace Renderer {
-}
+namespace Renderer {}

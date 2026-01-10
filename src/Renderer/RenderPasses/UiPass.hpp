@@ -3,19 +3,18 @@
 
 // todo Pass interface
 namespace Renderer {
-	class UiPass {
-	public:
-		UiPass();
+    class UiPass {
+    public:
+        UiPass();
 
-		void init();
-		void pass(RenderContext& ctx);
+        void init();
+        void pass(RenderContext &ctx);
 
-	private:
-
-		// drawText
-		// drawTexture
-		// drawRectangle
-		// drawLine
-		// Alligment enum class
-	};
-}
+    private:
+        // drawText
+        // drawTexture
+        // drawRectangle
+        // drawLine
+        // Alligment enum class
+    };
+} // namespace Renderer

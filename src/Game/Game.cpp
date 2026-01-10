@@ -2,8 +2,6 @@
 
 namespace Game {
 
-void Init() {
+    void Init() {}
 
-}
-
-}
+} // namespace Game

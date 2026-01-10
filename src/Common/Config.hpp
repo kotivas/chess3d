@@ -4,19 +4,19 @@
 #include <glm/vec4.hpp>
 
 struct Config {
-	// -- NO PREFIX ---
-	float sensitivity;
+    // -- NO PREFIX ---
+    float sensitivity;
 
-	// --- SYSTEM ---
-	glm::vec2 windowResolution;
+    // --- SYSTEM ---
+    glm::vec2 windowResolution;
 
-	bool autoExposure;
-	float autoExposureSpeed;
+    bool autoExposure;
+    float autoExposureSpeed;
 
-	// --- CONSOLE ---
-	float consoleFontScale;
-	int consoleLines;
-	glm::vec4 consoleColor;
+    // --- CONSOLE ---
+    float consoleFontScale;
+    int consoleLines;
+    glm::vec4 consoleColor;
 };
 
 extern Config g_config;

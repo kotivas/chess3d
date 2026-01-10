@@ -100,7 +100,7 @@ float PCF_Shadow(vec4 fragPosLightSpace, sampler2D shadowMap) {
     // PCF
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    float bias = 0.001;
+    float bias = 0.0000;
     int range = 3;
     for (int x = -range; x <= range; ++x) {
         for (int y = -range; y <= range; ++y) {
