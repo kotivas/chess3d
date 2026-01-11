@@ -82,12 +82,8 @@ namespace Renderer {
     }
 
     // calculates sun direction based on sun position and lut for shader
-    void Sky::calculateSun(const glm::vec2 &sun_pos) {
-        glm::quat qy = glm::angleAxis(sun_pos.y, glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::quat qx = glm::angleAxis(-sun_pos.x, glm::vec3(1.0f, 0.0f, 0.0f));
-        sunDirection = qy * (qx * glm::vec3(0.0f, 0.0f, 1.0f));
-
-        float sun_theta = std::acos(glm::clamp(sunDirection.y, 0.0f, 1.0f));
+    void Sky::calculateHw() {
+        const float sun_theta = std::acos(glm::clamp(sunDirection.y, 0.0f, 1.0f));
 
         for (auto &p : atmParams) p = glm::vec3(0.0f);
 
@@ -117,15 +113,24 @@ namespace Renderer {
         float denom = glm::dot(S, glm::vec3(0.2126f, 0.7152f, 0.0722f));
         if (denom != 0.0f) atmParams[9] /= denom;
 
-        float sun_amount = std::fmod(sunDirection.y / glm::half_pi<float>(), 4.0f);
-        if (sun_amount > 2.0f) sun_amount = 0.0f;
-        if (sun_amount > 1.0f)
-            sun_amount = 2.0f - sun_amount;
-        else if (sun_amount < -1.0f)
-            sun_amount = -2.0f - sun_amount;
+        float sunAmount = std::fmod(sunDirection.y / glm::half_pi<float>(), 4.0f);
+        if (sunAmount > 2.0f) sunAmount = 0.0f;
+        if (sunAmount > 1.0f)
+            sunAmount = 2.0f - sunAmount;
+        else if (sunAmount < -1.0f)
+            sunAmount = -2.0f - sunAmount;
 
-        float normalized_sun_y = 0.6f + 0.45f * sun_amount;
-        sunColor = glm::normalize(S * sun_amount) * glm::clamp(sunDirection.y, 0.f, 1.f) * glm::vec3(2.0);
+        float normalized_sun_y = 0.6f + 0.45f * sunAmount;
+        skyColor = normalize(S) * sunAmount;
+        sunColor = glm::normalize(S * sunAmount) * glm::clamp(sunDirection.y, 0.f, 1.f) * glm::vec3(2.0);
         atmParams[9] *= normalized_sun_y;
+    }
+
+    void Sky::update(const glm::vec2 &sun_dir) {
+        glm::quat qy = glm::angleAxis(sun_dir.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::quat qx = glm::angleAxis(-sun_dir.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        sunDirection = qy * (qx * glm::vec3(0.0f, 0.0f, 1.0f));
+
+        calculateHw();
     }
 } // namespace Renderer

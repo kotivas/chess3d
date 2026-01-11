@@ -24,7 +24,7 @@ namespace Renderer {
     void DrawSky(const SkyPtr &sky, const Camera::CameraInfo &cam, float time);
     void DrawTextureOnScreen(uint32_t texture, float x, float y, float w, float h);
     void DrawRectOnScreen(float x, float y, float w, float h, const glm::vec4 &color);
-    void DrawDebug(int fps, float scale, float time, glm::vec3 cam_pos);
+    void DrawDebug(float scale, float time, glm::vec3 cam_pos);
 
     void GenerateRenderItem(const std::shared_ptr<Drawable> &drawable, std::vector<RenderItem> &items);
 
@@ -44,6 +44,9 @@ namespace Renderer {
 
     static uint32_t quadVAO, quadVBO;
     static uint32_t sceneColorBufs[2];
+
+    static int g_fps = 0.f;
+    static double g_fpsAccum = 0.0f;
 
     static uint32_t screenFBO;
     static uint32_t screenColorBuf;

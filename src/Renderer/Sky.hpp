@@ -16,12 +16,14 @@ namespace Renderer {
         uint32_t vao, vbo;
         AssetManager::ShaderHandle shader;
 
-        glm::vec3 sunDirection;
-        glm::vec3 sunColor;
+        glm::vec3 skyColor;     // skyLight
+        glm::vec3 sunDirection; // sunLight
+        glm::vec3 sunColor;     // sunLight
         float atmTurbidity;
         std::array<glm::vec3, 10> atmParams;
 
-        void calculateSun(const glm::vec2 &sun_pos);
+        void calculateHw();
+        void update(const glm::vec2 &sun_dir);
 
         ~Sky();
     };

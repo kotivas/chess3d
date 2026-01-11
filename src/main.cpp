@@ -61,15 +61,18 @@ void setupScene(Scene &scene) {
     sky->atmTurbidity = 3.f;
     scene.sky = sky;
 
-    // ResourceMgr::LoadModel("makarov", "assets/models/makarov/pm.fbx", baseShader);
-    // if (const Renderer::ModelPtr makarov = ResourceMgr::GetModelByName("makarov")) {
-    //     makarov->transform = {
-    //         .position = {-35, 5, 0},
-    //         .quaternion = glm::quat(glm::radians(glm::vec3(5, 30, 10))),
-    //         .scale = glm::vec3(0.005),
-    //     };
-    //     scene.objects.push_back(makarov);
-    // }
+    ResourceMgr::LoadModel("makarov", "assets/models/makarov/pm.fbx", baseShader);
+    if (const Renderer::ModelPtr makarov = ResourceMgr::GetModelByName("makarov")) {
+        makarov->meshes[1]->material->normal = ResourceMgr::CreateTexture2D(
+            "assets/models/makarov/T_pt_ptm_skin_monolith_N.png", Renderer::TextureWrapMode::ClampToBorder);
+        makarov->meshes[1]->material->useNormal = true;
+        makarov->transform = {
+            .position = {0, 5, 0},
+            .quaternion = glm::quat(glm::radians(glm::vec3(-45, 0, 12))),
+            .scale = glm::vec3(0.005),
+        };
+        scene.objects.push_back(makarov);
+    }
 
     ResourceMgr::LoadMSDFFont(
         "inconsolata_light", "assets/fonts/inconsolata/inconsolata_light.png",
@@ -299,17 +302,19 @@ int main(int argc, char **argv) {
 
         // UPDATE
         if (!gIsPaused) {
-            scene.time += dt * 1;
+            scene.time += dt * 60;
             scene.time = fmod(scene.time, 86400.f);
 
             cameraController.update(scene.camera, dt);
             cameraController.handleControls(scene.camera);
             Console::Update(dt);
+
             const float dayFraction = glm::fract(scene.time / 86400); // 0..1
-            scene.sky->calculateSun({dayFraction * glm::two_pi<float>(), 0.f});
+            scene.sky->update({dayFraction * glm::two_pi<float>(), 0.f});
 
             scene.dir_light.diffuse = scene.sky->sunColor;
             scene.dir_light.specular = scene.sky->sunColor;
+            scene.dir_light.ambient = scene.sky->skyColor;
             scene.dir_light.direction = -scene.sky->sunDirection;
 
             if (scene.spot_light.enable) {

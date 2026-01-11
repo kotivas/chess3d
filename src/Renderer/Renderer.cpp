@@ -188,6 +188,8 @@ namespace Renderer {
     void DrawSky(const SkyPtr &sky, const Camera::CameraInfo &cam, float time) {
         const Shader *shader = AssetManager::g_shaderManager.get(sky->shader);
 
+        if (!shader) return;
+
         shader->use();
 
         shader->setUniform1f("uTime", time);
@@ -210,12 +212,19 @@ namespace Renderer {
         glEnable(GL_CULL_FACE);
     }
 
-    void DrawDebug(int fps, float scale, float time, glm::vec3 cam_pos) {
+    void DrawDebug(float scale, float time, glm::vec3 cam_pos) {
         const MsdfText::FontPtr font = ResourceMgr::GetFontByName("inconsolata_light");
+
+        const int hour = static_cast<int>(time) / 3600;
+        const int min = (static_cast<int>(time) / 60) % 60;
+
         const std::vector debugLines = {
-            "FPS: " + std::to_string(fps),
-            std::format("Cam pos: {0:.2f} {1:.2f} {2:.2f}", cam_pos.x, cam_pos.y, cam_pos.z),
-            std::format("Exp: {:.3f}", settings.FX.exposure), std::format("Time: {:.1f}", time)};
+            "FPS: " + std::to_string(g_fps),
+            std::format("Position: {0:.2f} {1:.2f} {2:.2f}", cam_pos.x, cam_pos.y, cam_pos.z),
+            std::format("Exposure: {:.3f}", settings.FX.exposure),
+            std::format("Time: {:.1f}", time),
+            std::format("{:02}:{:02}", hour, min),
+        };
 
         for (int i = 0; i < debugLines.size(); i++) {
             const float lineHeight = font->lineHeight * scale;
@@ -239,6 +248,12 @@ namespace Renderer {
 
     void Render(const Scene &scene, double dt) {
         RenderClear();
+
+        g_fpsAccum += dt;
+        if (g_fpsAccum >= 0.1) {
+            g_fpsAccum = 0;
+            g_fps = 1 / dt;
+        }
 
         const LightRenderInfo light{
             .directional = scene.dir_light, .point = scene.point_light, .spot = scene.spot_light};
@@ -267,7 +282,7 @@ namespace Renderer {
         ApplyPostProcess(dt); // todo PostFxPass
         // todo UIPass (UiElements)
         Console::Draw();
-        DrawDebug(static_cast<int>(1 / dt), 25, scene.time, scene.camera.position);
+        DrawDebug(25, scene.time, scene.camera.position);
 
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
